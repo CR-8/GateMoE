@@ -40,9 +40,14 @@ def run_doctor(cfg: Config) -> int:
 
     try:
         from .gateways.speech import SpeechGateway
-        for name, info in SpeechGateway(cfg).available().items():
-            results.append(_line(OK if info.get("available") else WARN, f"tts {name}",
-                                 ", ".join(info.get("languages", [])[:12]) or info.get("path", "")))
+        sg = SpeechGateway(cfg)
+        voiced = {lang: sg.engine_for(lang) for lang in cfg.languages}
+        engines = sorted({e for e in voiced.values() if e})
+        missing = sorted(lang for lang, e in voiced.items() if not e)
+        results.append(_line(OK if engines else WARN, "voices",
+                             f"{len(voiced) - len(missing)}/{len(voiced)} languages; engines: {', '.join(engines) or 'none'}"))
+        if missing:
+            results.append(_line(WARN, "no offline voice for", ", ".join(missing) + " (text + captions only)"))
     except Exception as exc:
         results.append(_line(WARN, "speech gateway", str(exc)))
 

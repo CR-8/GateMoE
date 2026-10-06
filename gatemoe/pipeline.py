@@ -156,24 +156,30 @@ class LessonPipeline:
 
         # 5. speech ----------------------------------------------------------------------------
         narration = None
-        try:
-            if "podcast" in lesson and tts_engine:
-                with ev.stage("tts_podcast"):
-                    lesson["podcast_audio"] = self.speech.podcast(lesson["podcast"]["turns"], code, out_dir, ev)
-                activated.append("tts:" + tts_engine)
-            if "video" in lesson and tts_engine:
-                with ev.stage("tts_narration"):
-                    narration = self.speech.narrate([b["narration"] for b in lesson["video"]["beats"]],
-                                                    code, out_dir / "narration", ev)
-                activated.append("tts:" + tts_engine)
-        except Cancelled:
-            raise
-        except Exception as exc:
-            lesson["errors"]["speech"] = f"{type(exc).__name__}: {exc}"
-        finally:
-            self.speech.close()
         if ("podcast" in lesson or "video" in lesson) and not tts_engine:
             lesson["errors"]["speech"] = f"no offline TTS voice installed for '{code}' (text and captions only)"
+        try:
+            if "podcast" in lesson and tts_engine:
+                try:
+                    with ev.stage("tts_podcast"):
+                        lesson["podcast_audio"] = self.speech.podcast(lesson["podcast"]["turns"], code, out_dir, ev)
+                    activated.append("tts:" + tts_engine)
+                except Cancelled:
+                    raise
+                except Exception as exc:
+                    lesson["errors"]["tts_podcast"] = f"{type(exc).__name__}: {exc}"
+            if "video" in lesson and tts_engine:
+                try:
+                    with ev.stage("tts_narration"):
+                        narration = self.speech.narrate([b["narration"] for b in lesson["video"]["beats"]],
+                                                        code, out_dir / "narration", ev)
+                    activated.append("tts:" + tts_engine)
+                except Cancelled:
+                    raise
+                except Exception as exc:  # the video still renders, silently, with subtitles
+                    lesson["errors"]["tts_narration"] = f"{type(exc).__name__}: {exc}"
+        finally:
+            self.speech.close()
 
         # 6. video -----------------------------------------------------------------------------
         if "video" in lesson and engine:
