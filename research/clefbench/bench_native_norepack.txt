@@ -1,0 +1,10 @@
+| model                          |       size |     params | backend    | threads | rpk |            test |                  t/s |
+| ------------------------------ | ---------: | ---------: | ---------- | ------: | --: | --------------: | -------------------: |
+| clef 9B Q4_K - Medium          |   6.03 GiB |     9.08 B | CPU        |       4 |   0 |           pp512 |         39.29 ± 0.25 |
+| clef 9B Q4_K - Medium          |   6.03 GiB |     9.08 B | CPU        |       4 |   0 |            tg32 |          4.46 ± 0.04 |
+
+build: 5e03bdd (1)
+
+real	1m15.048s
+user	4m51.874s
+sys	0m0.752s

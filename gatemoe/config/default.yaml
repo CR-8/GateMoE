@@ -1,0 +1,114 @@
+# GateMoE default configuration.
+# Target: Raspberry Pi 5 (8 GB), Pi-only, fully offline, models + data on a 1 TB USB HDD.
+# Override any key with your own YAML file:  GATEMOE_CONFIG=/path/to/my.yaml gatemoe serve
+# Values may reference other keys with ${section.key}.
+
+paths:
+  data_dir: /mnt/hdd/gatemoe                  # 1 TB USB HDD mount point
+  models_dir: ${paths.data_dir}/models        # GGUF + ONNX files
+  zim_dir: ${paths.data_dir}/zim              # Kiwix .zim files (offline knowledge)
+  jobs_dir: ${paths.data_dir}/jobs            # one folder per generated lesson
+  cache_dir: ${paths.data_dir}/cache          # router memo cache, TTS cache
+  llama_server: ${paths.data_dir}/llama.cpp/build/bin/llama-server
+  hyperframes_dir: ${paths.data_dir}/hyperframes   # npm project containing node_modules/hyperframes
+  chrome: /usr/bin/chromium                   # browser used by HyperFrames (Debian chromium on the Pi)
+  ffmpeg: ffmpeg
+  ffprobe: ffprobe
+  node: node
+  python: null                                # interpreter for the Manim subprocess (null = current)
+
+hardware:
+  threads: 4                                  # Pi 5 has 4 Cortex-A76 cores
+
+llama:
+  host: 127.0.0.1
+  extra_args: []                              # x86 CPUs with AMX need ["-nr"] (weight-repack bug)
+  ready_timeout_s: 600                        # cold load of a 5.6 GB GGUF from a USB HDD can take ~1 min
+  stop_timeout_s: 20
+
+# Only ONE big model is resident at a time (8 GB RAM). The manager swaps them.
+models:
+  router:
+    kind: decision                            # Clef-flash: serves POST /v1/systemone only
+    file: Cloudflare_clef-flash-Q4_0.gguf     # Q4_0 gets the fast 4x4 dotprod repack on Cortex-A76
+    port: 8082
+    ctx: 2048                                 # whole prompt must fit in one ubatch (-b/-ub = ctx)
+    args: ["-np", "1"]
+    request_timeout_s: 900
+  generator:
+    kind: chat
+    file: Qwen3.5-4B-Q4_0.gguf
+    port: 8081
+    ctx: 8192
+    args: ["-np", "1", "--jinja"]
+    request_timeout_s: 3600
+    temperature: 0.4
+    # Qwen3.5 "thinking" is switched off per request (chat_template_kwargs.enable_thinking=false).
+    disable_thinking: true
+
+router:
+  mode: clef               # clef = Clef-flash decides; all = every gateway (baseline); manual = user picks
+  threshold: 0.5           # a gateway fires when P(yes) >= threshold
+  memo_cache: true         # identical (request, schema, model) -> reuse decision (exact match only)
+  min_gateways: [notes]    # if nothing fires, run these
+  # Compact schema: every token here is re-read on every call (Clef keeps no KV cache).
+  gateways:
+    notes: "Make written study notes?"
+    flashcards: "Make flashcards?"
+    quiz: "Make a quiz?"
+    podcast: "Make an audio podcast?"
+    video: "Make an animated video?"
+    code: "Make code examples?"
+  subjects: [physics, chemistry, biology, mathematics, computer_science, electronics, electrical_engineering,
+             mechanical_engineering, civil_engineering, earth_science, other]
+  levels: [beginner, intermediate, advanced]
+  video_engines:
+    manim: "equations, graphs, geometry, algorithms"
+    hyperframes: "text, timelines, processes, charts, code"
+
+knowledge:
+  enabled: true
+  max_articles: 6          # articles fetched per query set
+  max_passages: 5          # passages packed into the generator prompt
+  passage_words: 200
+  max_source_chars: 6000   # hard cap on SOURCES text (keeps Pi prefill time bounded)
+  include_english: true    # also search English ZIMs for non-English requests
+
+generation:
+  flashcards: 8
+  quiz_questions: 5
+  podcast_turns: 10
+  video_beats: 6
+  max_tokens:
+    plan: 400
+    notes: 1400
+    flashcards: 900
+    quiz: 1200
+    podcast: 1400
+    code: 1000
+    video: 1400
+
+speech:
+  supertonic_dir: ${paths.models_dir}/supertonic-3   # contains onnx/ and voice_styles/
+  steps: 5                 # 5 flow steps: ~3.5% WER; 2 steps was 32% WER in our tests
+  speed: 1.0
+  threads: 4
+  voices: {A: F2, B: M1}   # two hosts for the podcast; narrator uses A
+  sherpa_dir: ${paths.models_dir}/sherpa-tts         # fallback engine models for languages Supertonic lacks
+  speaker_b_pitch: 0.89    # single-voice engines: speaker B is pitch-shifted by this factor
+  bitrate: 64k
+
+video:
+  enabled_engines: [manim, hyperframes]
+  width: 1280
+  height: 720
+  fps: 24
+  max_anim_seconds: 3.0    # each beat animates briefly, then its last frame is held for the narration
+  tail_pad_s: 0.4
+  render_timeout_s: 600
+  manim_quality: m         # l = 480p15, m = 720p30 (we override fps/size anyway)
+  sandbox_cpu_seconds: 900
+
+server:
+  host: 0.0.0.0
+  port: 8000

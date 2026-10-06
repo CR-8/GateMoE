@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GateMoE · Offline Tutor</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <span class="logo" aria-hidden="true">◆</span>
+    <div>
+      <h1>GateMoE</h1>
+      <p class="tag">Offline tutor · router → gateways → specialists · Raspberry Pi 5</p>
+    </div>
+  </div>
+  <div id="sys" class="sys" aria-live="polite">…</div>
+</header>
+
+<main>
+  <section class="card" id="ask">
+    <form id="form">
+      <label for="request" class="lbl">What do you want to learn?</label>
+      <textarea id="request" rows="3" maxlength="2000" required
+        placeholder="e.g. Explain Ohm's law with a quiz and a short video · ಓಮ್ ನಿಯಮವನ್ನು ವಿವರಿಸಿ · ओम का नियम समझाइए"></textarea>
+      <div class="row">
+        <label>Language
+          <select id="language"><option value="auto">Auto-detect</option></select>
+        </label>
+        <label>Routing
+          <select id="mode">
+            <option value="clef">Clef-flash router</option>
+            <option value="all">All gateways (baseline)</option>
+            <option value="manual">Manual choice</option>
+          </select>
+        </label>
+        <button type="submit" id="go">Create lesson</button>
+      </div>
+      <fieldset id="manual" hidden>
+        <legend>Gateways to run</legend>
+        <div id="gwboxes" class="chips"></div>
+      </fieldset>
+      <p class="hint">On a Raspberry Pi a full lesson takes several minutes — you can leave this page and come back.</p>
+    </form>
+  </section>
+
+  <section class="card" id="history">
+    <h2>Lessons</h2>
+    <ul id="jobs" class="jobs"></ul>
+  </section>
+
+  <section class="card" id="lesson" hidden>
+    <div class="lesson-head">
+      <div>
+        <h2 id="l-title">Lesson</h2>
+        <p id="l-req" class="muted"></p>
+      </div>
+      <div class="actions">
+        <span id="l-status" class="badge"></span>
+        <button id="cancel" class="ghost" hidden>Cancel</button>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="panel">
+        <h3>Master router decision</h3>
+        <div id="route" class="route muted">Waiting for the router…</div>
+      </div>
+      <div class="panel">
+        <h3>Conditional computation</h3>
+        <div id="cc" class="cc muted">—</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Pipeline</h3>
+      <ol id="stages" class="stages"></ol>
+    </div>
+
+    <nav class="tabs" id="tabs" role="tablist"></nav>
+    <div id="tabbody" class="tabbody"></div>
+  </section>
+</main>
+
+<footer class="foot">GateMoE runs fully offline. Sources: local Kiwix archives (CC BY-SA where applicable). Audio is AI-generated.</footer>
+<script src="/static/app.js"></script>
+</body>
+</html>
