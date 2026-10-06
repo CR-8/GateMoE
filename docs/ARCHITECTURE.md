@@ -19,7 +19,7 @@
                                     │                    or sherpa-onnx MMS (Indic languages)  │
                                     │ 6. VIDEO GATEWAY   Manim templates | HyperFrames templates│
                                     │                    + FFmpeg (narration, subtitles)       │
-                                    │ 7. lesson.json + notes.md + Anki TSV + mp3 + mp4         │
+                                    │ 7. HANDOUT (Typst PDF) + lesson.json + notes.md + Anki   │
                                     └────────────────────────────────────────────────────────┘
                                       1 TB USB HDD: models/, zim/, jobs/, cache/
 ```
@@ -29,7 +29,7 @@
 | Level | Who decides | What is decided |
 |---|---|---|
 | 1. Master router | **Clef-flash** decision model | which gateways run (`notes`, `flashcards`, `quiz`, `podcast`, `video`, `code`), subject, level, preferred video engine, in-scope |
-| 2. Gateway | gateway code (deterministic rules) | **Speech**: Supertonic vs MMS voice by language. **Video**: Manim vs HyperFrames by the router's engine choice + availability; template per beat chosen by the planner. **Knowledge**: which ZIMs by learner language (+ English). |
+| 2. Gateway | gateway code (deterministic rules) | **Speech**: configured plugin (e.g. Fish Audio server) → Supertonic 3 → MMS / Piper / sherpa by language. **Video**: Manim vs HyperFrames by the router's engine choice + availability; template per beat chosen by the planner; rejected beats repaired once by the LLM, then degraded to a bullet slide, then the other engine. **Knowledge**: which ZIMs by learner language (+ English) and subject. **Handout**: Typst PDF whenever notes/quiz/flashcards exist. |
 
 Only the selected gateways execute; only the specialists they need are loaded. Every lesson
 records `specialists.available` vs `specialists.activated` and all timings.
@@ -52,8 +52,9 @@ records `specialists.available` vs `specialists.activated` and all timings.
 | `gatemoe/llm/` | OpenAI-compatible JSON-schema client (non-thinking), schema validator |
 | `gatemoe/gateways/text.py`, `schemas.py` | prompts + schemas for plan, notes, flashcards, quiz, podcast, code, video plan |
 | `gatemoe/knowledge/` | ZIM catalogue, full-text search, HTML→text, passages, BM25 |
-| `gatemoe/gateways/speech/` | Supertonic 3 ONNX engine, sherpa-onnx fallback, podcast assembly |
-| `gatemoe/gateways/video/` | Manim + HyperFrames templates, sandboxed rendering, FFmpeg assembly, subtitles |
+| `gatemoe/gateways/speech/` | Supertonic 3, MMS, Piper, sherpa-onnx engines, config plugins (HTTP/command), podcast + narration |
+| `gatemoe/gateways/video/` | Manim templates + batch child process, HyperFrames templates + fallback renderer, sandbox, FFmpeg assembly, subtitles |
+| `gatemoe/gateways/handout.py` | Typst PDF handout (notes, glossary, cut-out flashcards, quiz + answer key) |
 | `gatemoe/pipeline.py` | the lesson pipeline (stages above) |
 | `gatemoe/jobs.py`, `gatemoe/server/` | job queue, REST + SSE API, web UI |
 | `gatemoe/cli.py` | `serve`, `lesson`, `route`, `catalog`, `doctor`, `swapbench` |
@@ -62,6 +63,10 @@ records `specialists.available` vs `specialists.activated` and all timings.
 ## Safety
 
 * LLM output is **data**, never code: templates read JSON slot values; function graphs use an AST
-  whitelist; HTML templates escape every string; generated Python examples are shown, not run.
+  whitelist; Typst maths passes a denylist (no `#`, `$`, LaTeX) and a precompile; HTML templates and
+  the Typst handout insert text only; generated Python examples are shown, not run.
+* Manim renders in one child process per lesson under `prlimit` (CPU seconds, address space,
+  file size, no core dumps), niced, with a minimal environment and a process-group kill on timeout;
+  HyperFrames/Chromium runs under the same CPU cap and timeout.
 * The web API serves only files inside the job's own folder; job ids are validated.
 * The app never needs the network; llama-server and render subprocesses get proxy variables removed.

@@ -18,7 +18,8 @@ request ─► language id ─► MASTER ROUTER (Cloudflare Clef-flash, one forw
      TEXT GATEWAY       KNOWLEDGE GATEWAY      SPEECH GATEWAY          VIDEO GATEWAY
    Qwen3.5-4B, JSON     Kiwix ZIM search        Supertonic 3 (31 langs)  Manim (maths) |
    schemas per task     (Wikipedia offline)     MMS / Piper (Indic)      HyperFrames (text)
-                                                                          + FFmpeg
+                                                + config plugins         + FFmpeg
+                                                  (e.g. Fish Audio)     HANDOUT: Typst PDF
 ```
 
 Only one big model is in RAM at a time (router ≈ 6 GB, generator ≈ 3 GB): the model manager
@@ -57,6 +58,7 @@ Full instructions: [docs/PI_SETUP.md](docs/PI_SETUP.md).
 * [docs/RESEARCH_FINDINGS.md](docs/RESEARCH_FINDINGS.md) — what was researched/measured before building (Clef-flash on CPU, Kiwix sizes, TTS, video, prior work) and the honest contribution
 * [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) — research questions and how to run them
 * [docs/PI_SETUP.md](docs/PI_SETUP.md) — install, memory settings, troubleshooting
+* [docs/EXTENDING.md](docs/EXTENDING.md) — plug in more voices (Fish Audio, Kokoro, …), video templates, ZIMs, languages
 * [research/](research/) — the multi-agent research/verification workflows, raw reports and the Clef CPU benchmark
 
 ## What is (and is not) claimed
