@@ -23,7 +23,7 @@ hardware:
 llama:
   host: 127.0.0.1
   extra_args: []                              # x86 CPUs with AMX need ["-nr"] (weight-repack bug)
-  ready_timeout_s: 600                        # cold load of a 5.6 GB GGUF from a USB HDD can take ~1 min
+  ready_timeout_s: 1200                       # cold load of 5.6 GB: ~1 min from a USB HDD, much longer from a slow SD card
   stop_timeout_s: 20
 
 # Only ONE big model is resident at a time (8 GB RAM). The manager swaps them.
