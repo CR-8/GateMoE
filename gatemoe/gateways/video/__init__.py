@@ -81,22 +81,52 @@ class VideoGateway:
     def available_engines(self) -> list[str]:
         return [name for name, eng in self.engines.items() if eng.available()]
 
-    # -- one beat ----------------------------------------------------------------------------
-    def _render_beat(self, engine: str, beat: dict, lang: str, title: str, out: Path, duration: float,
-                     work: Path) -> dict:
-        eng = self.engines[engine]
+    # -- validation (run while the generator is still loaded, so bad beats can be repaired) ----
+    def validate(self, plan: dict, lang: str, engine: str) -> dict[int, str]:
+        """{beat index: error} for beats the chosen engine would reject."""
+        beats = plan.get("beats") or []
+        if engine == "manim" and "manim" in self.engines:
+            from .manim_engine import beat_to_spec
+            errs = self.engines["manim"].check([beat_to_spec(b, lang) for b in beats])
+            return {i: e for i, e in enumerate(errs) if e}
         if engine == "hyperframes":
-            tpl, data = hf_scene(beat, lang, title)
-            return {"template": tpl, **eng.render(tpl, data, out, duration, work)}
-        return eng.render(beat, lang, out, duration, work)
+            from .hyperframes import build_payload
+            bad = {}
+            for i, b in enumerate(beats):
+                try:
+                    build_payload(*hf_scene(b, lang, plan.get("title", "")))
+                except ValueError as exc:
+                    bad[i] = str(exc)
+            return bad
+        return {}
 
+    # -- rendering ---------------------------------------------------------------------------
     def _safe_beat(self, beat: dict) -> dict:
         return {"template": "bullets", "title": beat.get("title", ""), "lines": _lines(beat),
                 "narration": beat.get("narration", "")}
 
-    # -- whole video -------------------------------------------------------------------------
+    def _render_pass(self, engine: str, jobs: list[tuple], lang: str, title: str, work: Path) -> dict:
+        """jobs = [(index, beat, out_path, duration)] -> {index: info dict | error string}."""
+        eng, results = self.engines[engine], {}
+        if engine == "manim":
+            from .manim_engine import beat_to_spec
+            res = eng.render_many([(beat_to_spec(b, lang), out, d) for (_, b, out, d) in jobs], work)
+            for (i, b, _, _), r in zip(jobs, res):
+                results[i] = ({"template": r.get("template"), "renderer": "manim", **r} if r.get("ok") else
+                              f"manim/{b.get('template')}: {r.get('kind')}: {str(r.get('error', ''))[:300]}")
+            return results
+        for i, b, out, d in jobs:
+            try:
+                tpl, data = hf_scene(b, lang, title)
+                results[i] = {"template": tpl, **eng.render(tpl, data, out, d, work)}
+            except Exception as exc:
+                results[i] = f"{engine}/{b.get('template')}: {type(exc).__name__}: {str(exc)[:300]}"
+        return results
+
     def render(self, plan: dict, narration: list[dict] | None, lang: str, engine: str, out_dir: Path,
                events: EventLog | None = None) -> dict:
+        import shutil
+
         beats = plan.get("beats") or []
         if not beats:
             raise ValueError("video plan has no beats")
@@ -108,36 +138,46 @@ class VideoGateway:
         others = [e for e in avail if e != engine]
         work = out_dir / "video_work"
         work.mkdir(parents=True, exist_ok=True)
-        tail = float(self.cfg["video.tail_pad_s"])
-        fps = int(self.cfg["video.fps"])
-        clips, durs, wavs, texts, report = [], [], [], [], []
+        tail, fps = float(self.cfg["video.tail_pad_s"]), int(self.cfg["video.fps"])
+        pending, wavs = [], {}
         for i, beat in enumerate(beats):
+            if narration and i < len(narration):
+                wavs[i], d = narration[i]["wav"], narration[i]["duration_s"] + tail
+            else:  # no voice: give the viewer time to read the caption
+                wavs[i], d = None, max(3.0, len(beat.get("narration") or "") / 14.0)
+            pending.append((i, beat, work / f"beat{i:02d}.mp4", d))
+        infos: dict[int, dict] = {}
+        errors: dict[int, list[str]] = {i: [] for i in range(len(beats))}
+        t0 = time.perf_counter()
+        # pass 1: router's engine as planned; pass 2: safe bullet slide; pass 3: the other engine(s)
+        for eng_name, safe in [(engine, False), (engine, True)] + [(o, True) for o in others]:
+            if not pending:
+                break
             if events:
                 events.check_cancel()
-            wav = None
-            if narration and i < len(narration):
-                wav = narration[i]["wav"]
-                d = narration[i]["duration_s"] + tail
-            else:  # no voice: give the viewer time to read the caption
-                d = max(3.0, len(beat.get("narration") or "") / 14.0)
-            out = work / f"beat{i:02d}.mp4"
-            t0 = time.perf_counter()
-            info, errors = None, []
-            for eng_name, b in [(engine, beat), (engine, self._safe_beat(beat))] + [(o, self._safe_beat(beat)) for o in others]:
-                try:
-                    info = self._render_beat(eng_name, b, lang, plan.get("title", ""), out, d, work)
-                    info["engine"] = eng_name
-                    break
-                except Exception as exc:
-                    errors.append(f"{eng_name}/{b.get('template')}: {type(exc).__name__}: {str(exc)[:300]}")
-            rec = {"index": i, "template": beat.get("template"), "seconds": round(time.perf_counter() - t0, 2),
-                   "ok": info is not None, "errors": errors}
+            jobs = [(i, self._safe_beat(b) if safe else b, out, d) for (i, b, out, d) in pending]
+            res = self._render_pass(eng_name, jobs, lang, plan.get("title", ""), work)
+            still = []
+            for job in pending:
+                r = res.get(job[0])
+                if isinstance(r, dict):
+                    infos[job[0]] = {**r, "engine": eng_name, "fallback": safe}
+                else:
+                    errors[job[0]].append(r or f"{eng_name}: no result")
+                    still.append(job)
+            pending = still
+        clips, durs, wav_list, texts, report = [], [], [], [], []
+        for i, beat in enumerate(beats):
+            info = infos.get(i)
+            rec = {"index": i, "template": beat.get("template"), "ok": info is not None, "errors": errors[i]}
             if info:
-                rec.update(engine=info["engine"], rendered_as=info.get("template"), renderer=info.get("renderer"))
-                real = probe_duration(out, self.cfg["paths.ffprobe"]) or d
+                out = work / f"beat{i:02d}.mp4"
+                rec.update(engine=info["engine"], rendered_as=info.get("template"), renderer=info.get("renderer"),
+                           fallback=info["fallback"])
+                real = probe_duration(out, self.cfg["paths.ffprobe"]) or pending_duration(beat)
                 clips.append(out)
                 durs.append(round(real * fps) / fps)
-                wavs.append(wav)
+                wav_list.append(wavs[i])
                 texts.append(beat.get("narration", ""))
             report.append(rec)
             if events:
@@ -145,11 +185,15 @@ class VideoGateway:
         if not clips:
             raise RuntimeError("every beat failed to render: " + "; ".join(e for r in report for e in r["errors"])[:1500])
         final = out_dir / "video.mp4"
-        assemble(clips, durs, wavs, final, self.cfg["paths.ffmpeg"])
+        assemble(clips, durs, wav_list, final, self.cfg["paths.ffmpeg"])
         write_subtitles(texts, durs, out_dir / "video.vtt", out_dir / "video.srt")
-        import shutil
         shutil.rmtree(work, ignore_errors=True)
         if narration:
             shutil.rmtree(Path(narration[0]["wav"]).parent, ignore_errors=True)   # muxed into video.mp4
         return {"video": "video.mp4", "subtitles": "video.vtt", "srt": "video.srt",
-                "duration_s": round(sum(durs), 2), "engine": engine, "beats": report}
+                "duration_s": round(sum(durs), 2), "engine": engine, "render_s": round(time.perf_counter() - t0, 2),
+                "beats": report}
+
+
+def pending_duration(beat: dict) -> float:
+    return max(3.0, len(beat.get("narration") or "") / 14.0)

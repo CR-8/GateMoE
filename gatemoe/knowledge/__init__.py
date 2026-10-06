@@ -10,12 +10,10 @@ No index is built on the Pi: every Kiwix ZIM ships its own full-text index.
 from __future__ import annotations
 
 import math
-import re
 import threading
 import time
 import unicodedata
 from collections import Counter
-from pathlib import Path
 
 from ..config import Config
 from ..runtime.events import EventLog

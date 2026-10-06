@@ -150,6 +150,28 @@ class LessonPipeline:
             except Exception as exc:  # one failed gateway must not sink the lesson
                 lesson["errors"][task] = f"{type(exc).__name__}: {exc}"
 
+        # 3b. check the video plan against the chosen renderer while the generator can still fix it
+        if "video" in lesson and engine:
+            try:
+                with ev.stage("check_video") as st:
+                    bad = self.video.validate(lesson["video"], code, engine)
+                    fixed = 0
+                    for i, err in list(bad.items())[: int(cfg.get("video.max_repairs", 3))]:
+                        ev.check_cancel()
+                        try:
+                            beat = tg.repair_beat(lesson["video"]["beats"][i], err, engine)
+                        except Cancelled:
+                            raise
+                        except Exception:
+                            continue
+                        lesson["video"]["beats"][i] = beat
+                        fixed += 1
+                    st.update(invalid=len(bad), repaired=fixed)
+            except Cancelled:
+                raise
+            except Exception as exc:  # validation is an optimisation; rendering still falls back per beat
+                lesson["errors"]["check_video"] = f"{type(exc).__name__}: {exc}"
+
         # 4. free RAM before audio/video work --------------------------------------------------
         with ev.stage("unload_generator"):
             self.models.unload(ev)

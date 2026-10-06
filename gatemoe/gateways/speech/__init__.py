@@ -27,7 +27,8 @@ class SpeechGateway:
             models=str(self.root), threads=int(cfg["speech.threads"]), steps=int(cfg["speech.steps"]),
             voice_a=cfg["speech.voices.A"], voice_b=cfg["speech.voices.B"], speed=float(cfg["speech.speed"]),
             fmt=cfg.get("speech.format", "mp3"), bitrate=cfg["speech.bitrate"],
-            st_variant=cfg.get("speech.supertonic_variant", "fp32"), ffmpeg=cfg["paths.ffmpeg"])
+            st_variant=cfg.get("speech.supertonic_variant", "fp32"), ffmpeg=cfg["paths.ffmpeg"],
+            plugins=list(cfg.get("speech.plugins") or []))
         self._engines: Engines | None = None
 
     @property
@@ -38,14 +39,13 @@ class SpeechGateway:
 
     # -- routing -----------------------------------------------------------------------------
     def engine_for(self, lang: str) -> str | None:
-        """'engine:model' that would speak ``lang``, or None if no voice is installed."""
-        eng = self.engines
-        if lang in ST_LANGS:
-            return "supertonic-3" if eng._exists("supertonic", "") else None
-        for cand in ENGINE_TABLE.get(lang, []):
-            if eng._exists(cand[0], cand[1]):
-                return f"{cand[0]}:{Path(cand[1]).name}"
-        return None   # we do not use Supertonic's 'na' fallback: unintelligible for other scripts
+        """'engine:model' that would speak ``lang``, or None if no voice is installed.
+        (Supertonic's 'na' fallback is never used: it is unintelligible for other scripts.)"""
+        try:
+            engine, model, *_ = self.engines.route(lang)
+        except RuntimeError:
+            return None
+        return "supertonic-3" if engine == "supertonic" else f"{engine}:{Path(model).name}"
 
     def available(self) -> dict:
         eng = self.engines
@@ -56,6 +56,9 @@ class SpeechGateway:
                 name = f"{cand[0]}:{Path(cand[1]).name}"
                 rec = out.setdefault(name, {"available": eng._exists(cand[0], cand[1]), "languages": []})
                 rec["languages"].append(lang)
+        for p in self.pcfg.plugins:
+            out[f"plugin:{p.get('name')}"] = {"available": True, "languages": p.get("languages") or ["*"],
+                                              "type": p.get("type")}
         return out
 
     # -- podcast -----------------------------------------------------------------------------

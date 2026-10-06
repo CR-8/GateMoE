@@ -137,3 +137,18 @@ class TextGateway:
             return self.gen.chat_json(self._messages(text), schemas.video_schema(engine, n),
                                       name="video", max_tokens=mt)
         raise ValueError(f"unknown text task {task!r}")
+
+    def repair_beat(self, beat: dict, error: str, video_engine: str) -> dict:
+        """Ask the generator to fix one video beat that a renderer rejected (one shot)."""
+        import json as _json
+
+        n = int(self.cfg["generation.video_beats"])
+        item = schemas.video_schema(video_engine, n)["properties"]["beats"]["items"]
+        listing = "\n".join(f"- {t}: {VIDEO_TEMPLATES[t]['slots']}" for t in templates_for(video_engine))
+        text = (f"Learner request: {self.request}\nThis video beat was rejected by the renderer:\n"
+                f"{_json.dumps(beat, ensure_ascii=False)}\nError: {error[:600]}\n"
+                f"Return a corrected beat. Keep the meaning and the {self.info['name']} narration. Templates:\n{listing}\n"
+                "Equations use Typst math (no LaTeX braces like frac{a}{b} or x^{2}: write (a)/(b) and x^2).")
+        return self.gen.chat_json(self._messages(text), item, name="video_repair",
+                                  max_tokens=int(400 * float(self.info.get("token_factor", 1.0))), temperature=0.2)
+

@@ -10,10 +10,8 @@ A model dir is auto-detected:
 """
 from __future__ import annotations
 
-import glob
 import json
 import os
-import sys
 import time
 from pathlib import Path
 

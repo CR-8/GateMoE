@@ -89,6 +89,7 @@ class PodcastConfig:
     max_loaded_engines: int = 2               # LRU cap on TTS models held in RAM
     st_variant: str = "fp32"                  # "int8" -> *.int8.onnx (k2-fsa quantised) if present
     ffmpeg: str = "ffmpeg"
+    plugins: list = field(default_factory=list)   # extra TTS engines from config (see plugin_tts.py)
 
 
 # ----------------------------------------------------------------- audio utils
@@ -206,7 +207,12 @@ class Engines:
     def unload(self) -> None:
         self._cache.clear()
 
+    def _plugin(self, name: str) -> dict | None:
+        return next((p for p in self.cfg.plugins if p.get("name") == name), None)
+
     def _exists(self, engine: str, model: str) -> bool:
+        if engine == "plugin":
+            return self._plugin(model) is not None
         if engine == "supertonic":
             return (self.root / "supertonic3" / "onnx" / "vector_estimator.onnx").exists()
         if engine == "mms":
@@ -215,14 +221,21 @@ class Engines:
         return d.is_dir() and any(d.glob("*.onnx"))
 
     def route(self, lang: str) -> tuple:
-        if lang in ST_LANGS:
+        from .plugin_tts import plugin_for
+        pref = plugin_for(lang, self.cfg.plugins)
+        if pref:   # a configured engine (e.g. Fish Speech server) preferred for this language
+            v = pref.get("voices") or {}
+            return ("plugin", pref["name"], v.get("A"), v.get("B"))
+        if lang in ST_LANGS and self._exists("supertonic", ""):
             return ("supertonic", "supertonic3", self.cfg.voice_a, self.cfg.voice_b)
         for cand in ENGINE_TABLE.get(lang, []):
             if self._exists(cand[0], cand[1]):
                 return cand
-        if self._exists("supertonic", ""):
-            log.warning("no dedicated TTS for %r - using Supertonic 'na' fallback", lang)
-            return ("supertonic", "supertonic3", self.cfg.voice_a, self.cfg.voice_b)
+        for p in self.cfg.plugins:   # non-preferred plugins act as fallbacks
+            langs = p.get("languages") or ["*"]
+            if "*" in langs or lang in langs:
+                v = p.get("voices") or {}
+                return ("plugin", p["name"], v.get("A"), v.get("B"))
         raise RuntimeError(f"no TTS engine available for language {lang!r}")
 
     def get(self, engine: str, model: str):
@@ -243,6 +256,9 @@ class Engines:
             elif engine == "sherpa":
                 from .sherpa_tts import SherpaTTS
                 self._cache[key] = SherpaTTS(self.root / model, threads=th)
+            elif engine == "plugin":
+                from .plugin_tts import PluginTTS
+                self._cache[key] = PluginTTS(self._plugin(model), ffmpeg=self.cfg.ffmpeg)
             elif engine == "piper":
                 from .piper_engine import PiperEngine
                 d = self.root / model
@@ -263,6 +279,8 @@ class Engines:
             st_lang = lang if lang in ST_LANGS else "na"
             wav, sr = eng.synth(text, lang=st_lang, voice=voice, steps=self.cfg.steps,
                                 speed=self.cfg.speed, seed=self.cfg.seed)
+        elif engine == "plugin":
+            wav, sr = eng.synth(text, lang=lang, voice=voice, speed=self.cfg.speed)
         elif engine == "mms":
             from .numbers_indic import verbalize_numbers      # MMS cannot read digits
             text = verbalize_numbers(text, lang)

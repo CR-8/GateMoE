@@ -104,15 +104,18 @@ speech:
   bitrate: 64k
 
 video:
-  enabled_engines: [manim, hyperframes]
+  enabled_engines: [manim, hyperframes]   # router's video_engine picks one; the other is the fallback
   width: 1280
   height: 720
   fps: 24
-  max_anim_seconds: 3.0    # each beat animates briefly, then its last frame is held for the narration
-  tail_pad_s: 0.4
+  tail_pad_s: 0.4          # silence after each beat's narration
+  max_repairs: 3           # invalid beats sent back to the generator once (while it is still loaded)
+  # HyperFrames (Chromium) per-beat limits
   render_timeout_s: 600
-  manim_quality: m         # l = 480p15, m = 720p30 (we override fps/size anyway)
   sandbox_cpu_seconds: 900
+  # Manim: one sandboxed batch process per lesson (prlimit CPU / address space / file size)
+  manim_cpu_s_per_beat: 90
+  manim_as_mb: 2048        # >= 1024 MB measured minimum
 
 server:
   host: 0.0.0.0

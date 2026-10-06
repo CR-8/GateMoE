@@ -26,7 +26,6 @@ from __future__ import annotations
 import json
 import logging
 import re
-import sys
 import time
 import unicodedata
 import wave
