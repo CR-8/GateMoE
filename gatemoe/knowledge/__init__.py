@@ -149,13 +149,31 @@ class KnowledgeBase:
 
     # -- search ------------------------------------------------------------------------------
     def _search_one(self, z: dict, query: str, k: int) -> list[str]:
+        """Full-text search with progressive relaxation (Xapian matches ALL words of a query, and
+        there is no stemming for most Indic languages): full query -> first two words -> each of
+        the first three words -> title suggestions."""
+        from libzim.suggestion import SuggestionSearcher
+
         a = self._archive(z["file"])
+        words = list(dict.fromkeys(w for w in tokenize(query) if len(w) > 1))   # original order, deduped
+        attempts = [query]
+        if len(words) > 2:
+            attempts.append(" ".join(words[:2]))        # learner requests usually start with the topic
+        attempts += [w for w in words[:3] if w not in attempts]
+        found: list[str] = []
         if z.get("fulltext"):
             from libzim.search import Query, Searcher
-            res = Searcher(a).search(Query().set_query(query))
-            return list(res.getResults(0, k))
-        from libzim.suggestion import SuggestionSearcher
-        return list(SuggestionSearcher(a).suggest(query).getResults(0, k))
+            for q in attempts:
+                found = list(Searcher(a).search(Query().set_query(q)).getResults(0, k))
+                if found:
+                    return found
+        for q in [query] + words[:2]:
+            for path in SuggestionSearcher(a).suggest(q).getResults(0, k):
+                if path not in found:
+                    found.append(path)
+            if len(found) >= k:
+                break
+        return found[:k]
 
     def _article(self, z: dict, path: str) -> tuple[str, list[str]] | None:
         a = self._archive(z["file"])

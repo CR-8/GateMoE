@@ -79,6 +79,8 @@ class Generator:
                 if not errs:
                     return obj
                 last_err = GenerationError(f"{name}: schema errors: {errs[:5]}")
+            if choice.get("finish_reason") == "length":   # truncated: a same-size retry would fail again
+                body["max_tokens"] = int(body["max_tokens"] * 1.6)
             body["temperature"] = 0.2
             body["seed"] = seed + attempt + 1
         raise last_err or GenerationError(name)

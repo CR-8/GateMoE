@@ -39,11 +39,10 @@ def _obj(props: dict, required: list[str] | None = None) -> dict:
 
 def plan_schema() -> dict:
     return _obj({
-        "title": _str(120),
-        "search_queries_en": _arr(_str(80), 1, 3),
-        "search_queries_native": _arr(_str(80), 0, 3),
-        "key_terms": _arr(_str(60), 3, 8),
-        "outline": _arr(_str(140), 3, 6),
+        "title": _str(100),
+        "search_queries_en": _arr(_str(60), 1, 3),
+        "search_queries_native": _arr(_str(60), 0, 2),
+        "key_terms": _arr(_str(40), 2, 6),
     })
 
 
