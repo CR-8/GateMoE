@@ -1,0 +1,104 @@
+[
+ {
+  "label": "probe:1_noul",
+  "latency_ms": 4839.5,
+  "input_tokens": 175,
+  "metrics_delta": {
+   "prompt_tokens_total": 175.0,
+   "prompt_seconds_total": 4.83672,
+   "tokens_predicted_total": 0.0,
+   "prompt_tokens_cached_total": 0.0
+  },
+  "prefill_tps_metrics": 36.18,
+  "decisions": {
+   "needs_quiz": 0.951
+  }
+ },
+ {
+  "label": "probe:2_noul",
+  "latency_ms": 7418.4,
+  "input_tokens": 265,
+  "metrics_delta": {
+   "prompt_tokens_total": 265.0,
+   "prompt_seconds_total": 7.41558,
+   "tokens_predicted_total": 0.0,
+   "prompt_tokens_cached_total": 0.0
+  },
+  "prefill_tps_metrics": 35.74,
+  "decisions": {
+   "needs_quiz": 0.947,
+   "needs_podcast": 0.937
+  }
+ },
+ {
+  "label": "probe:9q_no_voice",
+  "latency_ms": 26885.6,
+  "input_tokens": 964,
+  "metrics_delta": {
+   "prompt_tokens_total": 964.0,
+   "prompt_seconds_total": 26.879600000000003,
+   "tokens_predicted_total": 0.0,
+   "prompt_tokens_cached_total": 0.0
+  },
+  "prefill_tps_metrics": 35.86,
+  "decisions": {
+   "needs_notes": 0.533,
+   "needs_flashcards": 0.046,
+   "needs_quiz": 0.963,
+   "needs_podcast": 0.939,
+   "needs_video": 0.063,
+   "needs_code": 0.161,
+   "subject": "cs(0.90)",
+   "difficulty": "0.65",
+   "video_style": "none(0.45)"
+  }
+ },
+ {
+  "label": "terse10:binary_search",
+  "latency_ms": 24262.7,
+  "input_tokens": 897,
+  "metrics_delta": {
+   "prompt_tokens_total": 897.0,
+   "prompt_seconds_total": 24.2568,
+   "tokens_predicted_total": 0.0,
+   "prompt_tokens_cached_total": 0.0
+  },
+  "prefill_tps_metrics": 36.98,
+  "decisions": {
+   "notes": 0.756,
+   "flashcards": 0.134,
+   "quiz": 0.946,
+   "podcast": 0.916,
+   "video": 0.047,
+   "code": 0.224,
+   "subject": "cs(0.94)",
+   "difficulty": "0.84",
+   "video_style": "none(0.81)",
+   "voice_mode": "single_narrator(0.64)"
+  }
+ },
+ {
+  "label": "terse10:ww1_summary",
+  "latency_ms": 24353.5,
+  "input_tokens": 893,
+  "metrics_delta": {
+   "prompt_tokens_total": 893.0,
+   "prompt_seconds_total": 24.348200000000006,
+   "tokens_predicted_total": 0.0,
+   "prompt_tokens_cached_total": 0.0
+  },
+  "prefill_tps_metrics": 36.68,
+  "decisions": {
+   "notes": 0.508,
+   "flashcards": 0.096,
+   "quiz": 0.023,
+   "podcast": 0.028,
+   "video": 0.016,
+   "code": 0.004,
+   "subject": "history(0.99)",
+   "difficulty": "0.79",
+   "video_style": "none(0.95)",
+   "voice_mode": "single_narrator(0.73)"
+  }
+ }
+]

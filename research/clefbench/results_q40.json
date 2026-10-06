@@ -1,0 +1,146 @@
+[
+ {
+  "label": "q:binary_search",
+  "latency_ms": 57099.0,
+  "input_tokens": 1048,
+  "metrics_delta": {
+   "prompt_tokens_total": 1048.0,
+   "prompt_seconds_total": 57.088,
+   "tokens_predicted_total": 0.0,
+   "prompt_tokens_cached_total": 0.0
+  },
+  "prefill_tps_metrics": 18.36,
+  "decisions": {
+   "needs_notes": 0.409,
+   "needs_flashcards": 0.075,
+   "needs_quiz": 0.948,
+   "needs_podcast": 0.962,
+   "needs_video": 0.084,
+   "needs_code": 0.228,
+   "subject": "cs(0.93)",
+   "difficulty": "0.47",
+   "video_style": "html_motion(0.61)",
+   "voice_mode": "single_narrator(0.85)"
+  }
+ },
+ {
+  "label": "q:photosynthesis_podcast",
+  "latency_ms": 56968.8,
+  "input_tokens": 1044,
+  "metrics_delta": {
+   "prompt_tokens_total": 1044.0,
+   "prompt_seconds_total": 56.958999999999996,
+   "tokens_predicted_total": 0.0,
+   "prompt_tokens_cached_total": 0.0
+  },
+  "prefill_tps_metrics": 18.33,
+  "decisions": {
+   "needs_notes": 0.027,
+   "needs_flashcards": 0.022,
+   "needs_quiz": 0.049,
+   "needs_podcast": 0.846,
+   "needs_video": 0.059,
+   "needs_code": 0.003,
+   "subject": "biology(0.96)",
+   "difficulty": "0.69",
+   "video_style": "none(0.48)",
+   "voice_mode": "two_speaker_dialogue(0.98)"
+  }
+ },
+ {
+  "label": "q:derivative_anim",
+  "latency_ms": 55169.6,
+  "input_tokens": 1043,
+  "metrics_delta": {
+   "prompt_tokens_total": 1043.0,
+   "prompt_seconds_total": 55.162000000000006,
+   "tokens_predicted_total": 0.0,
+   "prompt_tokens_cached_total": 0.0
+  },
+  "prefill_tps_metrics": 18.91,
+  "decisions": {
+   "needs_notes": 0.033,
+   "needs_flashcards": 0.009,
+   "needs_quiz": 0.01,
+   "needs_podcast": 0.026,
+   "needs_video": 0.952,
+   "needs_code": 0.037,
+   "subject": "maths(0.94)",
+   "difficulty": "0.67",
+   "video_style": "manim_math(0.93)",
+   "voice_mode": "single_narrator(0.87)"
+  }
+ },
+ {
+  "label": "q:python_listcomp",
+  "latency_ms": 56793.3,
+  "input_tokens": 1038,
+  "metrics_delta": {
+   "prompt_tokens_total": 1038.0,
+   "prompt_seconds_total": 56.787000000000006,
+   "tokens_predicted_total": 0.0,
+   "prompt_tokens_cached_total": 0.0
+  },
+  "prefill_tps_metrics": 18.28,
+  "decisions": {
+   "needs_notes": 0.046,
+   "needs_flashcards": 0.015,
+   "needs_quiz": 0.67,
+   "needs_podcast": 0.008,
+   "needs_video": 0.026,
+   "needs_code": 0.971,
+   "subject": "cs(0.98)",
+   "difficulty": "0.96",
+   "video_style": "none(0.76)",
+   "voice_mode": "single_narrator(0.74)"
+  }
+ },
+ {
+  "label": "q:french_flashcards",
+  "latency_ms": 55121.0,
+  "input_tokens": 1034,
+  "metrics_delta": {
+   "prompt_tokens_total": 1034.0,
+   "prompt_seconds_total": 55.11499999999998,
+   "tokens_predicted_total": 0.0,
+   "prompt_tokens_cached_total": 0.0
+  },
+  "prefill_tps_metrics": 18.76,
+  "decisions": {
+   "needs_notes": 0.022,
+   "needs_flashcards": 0.973,
+   "needs_quiz": 0.01,
+   "needs_podcast": 0.034,
+   "needs_video": 0.008,
+   "needs_code": 0.004,
+   "subject": "language(0.97)",
+   "difficulty": "0.03",
+   "video_style": "none(0.93)",
+   "voice_mode": "single_narrator(0.67)"
+  }
+ },
+ {
+  "label": "q:ww1_summary",
+  "latency_ms": 55470.9,
+  "input_tokens": 1044,
+  "metrics_delta": {
+   "prompt_tokens_total": 1044.0,
+   "prompt_seconds_total": 55.46300000000002,
+   "tokens_predicted_total": 0.0,
+   "prompt_tokens_cached_total": 0.0
+  },
+  "prefill_tps_metrics": 18.82,
+  "decisions": {
+   "needs_notes": 0.354,
+   "needs_flashcards": 0.063,
+   "needs_quiz": 0.031,
+   "needs_podcast": 0.053,
+   "needs_video": 0.052,
+   "needs_code": 0.003,
+   "subject": "history(0.99)",
+   "difficulty": "0.85",
+   "video_style": "none(0.58)",
+   "voice_mode": "single_narrator(0.89)"
+  }
+ }
+]

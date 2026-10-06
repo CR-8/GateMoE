@@ -1,0 +1,27 @@
+| model                          |       size |     params | backend    | threads |            test |                  t/s |
+| ------------------------------ | ---------: | ---------: | ---------- | ------: | --------------: | -------------------: |
+/home/user/ggml-org/llama.cpp/ggml/src/ggml-backend.cpp:1434: GGML_ASSERT(*cur_backend_id != -1) failed
+[New LWP 16352]
+[New LWP 16351]
+[New LWP 16350]
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+0x00007f9ee6f10913 in __GI___wait4 (pid=16353, stat_loc=0x0, options=0, usage=0x0) at ../sysdeps/unix/sysv/linux/wait4.c:30
+warning: 30	../sysdeps/unix/sysv/linux/wait4.c: No such file or directory
+#0  0x00007f9ee6f10913 in __GI___wait4 (pid=16353, stat_loc=0x0, options=0, usage=0x0) at ../sysdeps/unix/sysv/linux/wait4.c:30
+30	in ../sysdeps/unix/sysv/linux/wait4.c
+#1  0x00007f9ee7146a53 in ggml_print_backtrace () from /tmp/claude-0/-home-user-GateMoE/fb8f141f-48cd-5abb-adc1-ed41947d5a7d/scratchpad/llama-build/bin/libggml-base.so.0
+#2  0x00007f9ee7146bfb in ggml_abort () from /tmp/claude-0/-home-user-GateMoE/fb8f141f-48cd-5abb-adc1-ed41947d5a7d/scratchpad/llama-build/bin/libggml-base.so.0
+#3  0x00007f9ee716292b in ggml_backend_sched_split_graph () from /tmp/claude-0/-home-user-GateMoE/fb8f141f-48cd-5abb-adc1-ed41947d5a7d/scratchpad/llama-build/bin/libggml-base.so.0
+#4  0x00007f9ee661265a in llama_context::graph_reserve(unsigned int, unsigned int, unsigned int, llama_memory_context_i const*, bool, unsigned long*) () from /tmp/claude-0/-home-user-GateMoE/fb8f141f-48cd-5abb-adc1-ed41947d5a7d/scratchpad/llama-build/bin/libllama.so.0
+#5  0x00007f9ee6612d2a in llama_context::resolve_fused_ops(llama_memory_context_i const*, unsigned int) () from /tmp/claude-0/-home-user-GateMoE/fb8f141f-48cd-5abb-adc1-ed41947d5a7d/scratchpad/llama-build/bin/libllama.so.0
+#6  0x00007f9ee6613c5e in llama_context::sched_reserve() () from /tmp/claude-0/-home-user-GateMoE/fb8f141f-48cd-5abb-adc1-ed41947d5a7d/scratchpad/llama-build/bin/libllama.so.0
+#7  0x00007f9ee6615299 in llama_context::llama_context(llama_model const&, llama_context_params) () from /tmp/claude-0/-home-user-GateMoE/fb8f141f-48cd-5abb-adc1-ed41947d5a7d/scratchpad/llama-build/bin/libllama.so.0
+#8  0x00007f9ee6616594 in llama_init_from_model () from /tmp/claude-0/-home-user-GateMoE/fb8f141f-48cd-5abb-adc1-ed41947d5a7d/scratchpad/llama-build/bin/libllama.so.0
+#9  0x00007f9ee758d104 in llama_bench(int, char**) () from /tmp/claude-0/-home-user-GateMoE/fb8f141f-48cd-5abb-adc1-ed41947d5a7d/scratchpad/llama-build/bin/libllama-bench-impl.so
+#10 0x00007f9ee6e2a1ca in __libc_start_call_main (main=main@entry=0x555932cac270 <main>, argc=argc@entry=13, argv=argv@entry=0x7ffebd2783e8) at ../sysdeps/nptl/libc_start_call_main.h:58
+warning: 58	../sysdeps/nptl/libc_start_call_main.h: No such file or directory
+#11 0x00007f9ee6e2a28b in __libc_start_main_impl (main=0x555932cac270 <main>, argc=13, argv=0x7ffebd2783e8, init=<optimized out>, fini=<optimized out>, rtld_fini=<optimized out>, stack_end=0x7ffebd2783d8) at ../csu/libc-start.c:360
+warning: 360	../csu/libc-start.c: No such file or directory
+#12 0x0000555932cac2a5 in _start ()
+[Inferior 1 (process 16349) detached]

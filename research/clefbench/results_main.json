@@ -1,0 +1,301 @@
+[
+ {
+  "label": "cold:binary_search",
+  "latency_ms": 29798.1,
+  "input_tokens": 1048,
+  "metrics_delta": {
+   "prompt_tokens_total": 1048.0,
+   "prompt_seconds_total": 29.7907,
+   "tokens_predicted_total": 0.0,
+   "prompt_tokens_cached_total": 0.0
+  },
+  "prefill_tps_metrics": 35.18,
+  "decisions": {
+   "needs_notes": 0.537,
+   "needs_flashcards": 0.046,
+   "needs_quiz": 0.965,
+   "needs_podcast": 0.942,
+   "needs_video": 0.062,
+   "needs_code": 0.162,
+   "subject": "cs(0.90)",
+   "difficulty": "0.65",
+   "video_style": "none(0.46)",
+   "voice_mode": "single_narrator(0.85)"
+  }
+ },
+ {
+  "label": "warm_repeat1:binary_search",
+  "latency_ms": 29315.4,
+  "input_tokens": 1048,
+  "metrics_delta": {
+   "prompt_tokens_total": 1048.0,
+   "prompt_seconds_total": 29.307899999999997,
+   "tokens_predicted_total": 0.0,
+   "prompt_tokens_cached_total": 0.0
+  },
+  "prefill_tps_metrics": 35.76,
+  "decisions": {
+   "needs_notes": 0.537,
+   "needs_flashcards": 0.046,
+   "needs_quiz": 0.965,
+   "needs_podcast": 0.942,
+   "needs_video": 0.062,
+   "needs_code": 0.162,
+   "subject": "cs(0.90)",
+   "difficulty": "0.65",
+   "video_style": "none(0.46)",
+   "voice_mode": "single_narrator(0.85)"
+  }
+ },
+ {
+  "label": "warm_repeat2:binary_search",
+  "latency_ms": 29214.8,
+  "input_tokens": 1048,
+  "metrics_delta": {
+   "prompt_tokens_total": 1048.0,
+   "prompt_seconds_total": 29.208500000000008,
+   "tokens_predicted_total": 0.0,
+   "prompt_tokens_cached_total": 0.0
+  },
+  "prefill_tps_metrics": 35.88,
+  "decisions": {
+   "needs_notes": 0.537,
+   "needs_flashcards": 0.046,
+   "needs_quiz": 0.965,
+   "needs_podcast": 0.942,
+   "needs_video": 0.062,
+   "needs_code": 0.162,
+   "subject": "cs(0.90)",
+   "difficulty": "0.65",
+   "video_style": "none(0.46)",
+   "voice_mode": "single_narrator(0.85)"
+  }
+ },
+ {
+  "label": "warm_repeat3:binary_search",
+  "latency_ms": 28879.1,
+  "input_tokens": 1048,
+  "metrics_delta": {
+   "prompt_tokens_total": 1048.0,
+   "prompt_seconds_total": 28.8729,
+   "tokens_predicted_total": 0.0,
+   "prompt_tokens_cached_total": 0.0
+  },
+  "prefill_tps_metrics": 36.3,
+  "decisions": {
+   "needs_notes": 0.537,
+   "needs_flashcards": 0.046,
+   "needs_quiz": 0.965,
+   "needs_podcast": 0.942,
+   "needs_video": 0.062,
+   "needs_code": 0.162,
+   "subject": "cs(0.90)",
+   "difficulty": "0.65",
+   "video_style": "none(0.46)",
+   "voice_mode": "single_narrator(0.85)"
+  }
+ },
+ {
+  "label": "new_state:photosynthesis_podcast",
+  "latency_ms": 28305.1,
+  "input_tokens": 1044,
+  "metrics_delta": {
+   "prompt_tokens_total": 1044.0,
+   "prompt_seconds_total": 28.299000000000007,
+   "tokens_predicted_total": 0.0,
+   "prompt_tokens_cached_total": 0.0
+  },
+  "prefill_tps_metrics": 36.89,
+  "decisions": {
+   "needs_notes": 0.035,
+   "needs_flashcards": 0.022,
+   "needs_quiz": 0.054,
+   "needs_podcast": 0.848,
+   "needs_video": 0.055,
+   "needs_code": 0.003,
+   "subject": "biology(0.96)",
+   "difficulty": "0.64",
+   "video_style": "none(0.56)",
+   "voice_mode": "two_speaker_dialogue(0.98)"
+  }
+ },
+ {
+  "label": "new_state:derivative_anim",
+  "latency_ms": 29425.9,
+  "input_tokens": 1043,
+  "metrics_delta": {
+   "prompt_tokens_total": 1043.0,
+   "prompt_seconds_total": 29.419999999999987,
+   "tokens_predicted_total": 0.0,
+   "prompt_tokens_cached_total": 0.0
+  },
+  "prefill_tps_metrics": 35.45,
+  "decisions": {
+   "needs_notes": 0.028,
+   "needs_flashcards": 0.009,
+   "needs_quiz": 0.01,
+   "needs_podcast": 0.016,
+   "needs_video": 0.938,
+   "needs_code": 0.027,
+   "subject": "maths(0.95)",
+   "difficulty": "0.80",
+   "video_style": "manim_math(0.93)",
+   "voice_mode": "single_narrator(0.88)"
+  }
+ },
+ {
+  "label": "new_state:python_listcomp",
+  "latency_ms": 28032.0,
+  "input_tokens": 1038,
+  "metrics_delta": {
+   "prompt_tokens_total": 1038.0,
+   "prompt_seconds_total": 28.022999999999996,
+   "tokens_predicted_total": 0.0,
+   "prompt_tokens_cached_total": 0.0
+  },
+  "prefill_tps_metrics": 37.04,
+  "decisions": {
+   "needs_notes": 0.063,
+   "needs_flashcards": 0.014,
+   "needs_quiz": 0.483,
+   "needs_podcast": 0.007,
+   "needs_video": 0.019,
+   "needs_code": 0.97,
+   "subject": "cs(0.98)",
+   "difficulty": "0.93",
+   "video_style": "none(0.87)",
+   "voice_mode": "single_narrator(0.69)"
+  }
+ },
+ {
+  "label": "new_state:french_flashcards",
+  "latency_ms": 28002.4,
+  "input_tokens": 1034,
+  "metrics_delta": {
+   "prompt_tokens_total": 1034.0,
+   "prompt_seconds_total": 27.997000000000014,
+   "tokens_predicted_total": 0.0,
+   "prompt_tokens_cached_total": 0.0
+  },
+  "prefill_tps_metrics": 36.93,
+  "decisions": {
+   "needs_notes": 0.019,
+   "needs_flashcards": 0.967,
+   "needs_quiz": 0.01,
+   "needs_podcast": 0.026,
+   "needs_video": 0.007,
+   "needs_code": 0.004,
+   "subject": "language(0.96)",
+   "difficulty": "0.02",
+   "video_style": "none(0.96)",
+   "voice_mode": "single_narrator(0.68)"
+  }
+ },
+ {
+  "label": "new_state:ww1_summary",
+  "latency_ms": 28930.5,
+  "input_tokens": 1044,
+  "metrics_delta": {
+   "prompt_tokens_total": 1044.0,
+   "prompt_seconds_total": 28.924000000000007,
+   "tokens_predicted_total": 0.0,
+   "prompt_tokens_cached_total": 0.0
+  },
+  "prefill_tps_metrics": 36.09,
+  "decisions": {
+   "needs_notes": 0.376,
+   "needs_flashcards": 0.051,
+   "needs_quiz": 0.033,
+   "needs_podcast": 0.046,
+   "needs_video": 0.033,
+   "needs_code": 0.003,
+   "subject": "history(0.99)",
+   "difficulty": "0.77",
+   "video_style": "none(0.65)",
+   "voice_mode": "single_narrator(0.89)"
+  }
+ },
+ {
+  "label": "repeat_after_others:binary_search",
+  "latency_ms": 29232.5,
+  "input_tokens": 1048,
+  "metrics_delta": {
+   "prompt_tokens_total": 1048.0,
+   "prompt_seconds_total": 29.224999999999966,
+   "tokens_predicted_total": 0.0,
+   "prompt_tokens_cached_total": 0.0
+  },
+  "prefill_tps_metrics": 35.86,
+  "decisions": {
+   "needs_notes": 0.537,
+   "needs_flashcards": 0.046,
+   "needs_quiz": 0.965,
+   "needs_podcast": 0.942,
+   "needs_video": 0.062,
+   "needs_code": 0.162,
+   "subject": "cs(0.90)",
+   "difficulty": "0.65",
+   "video_style": "none(0.46)",
+   "voice_mode": "single_narrator(0.85)"
+  }
+ },
+ {
+  "label": "probe:1_question",
+  "latency_ms": 6085.2,
+  "input_tokens": 241,
+  "metrics_delta": {
+   "prompt_tokens_total": 241.0,
+   "prompt_seconds_total": 6.079000000000008,
+   "tokens_predicted_total": 0.0,
+   "prompt_tokens_cached_total": 0.0
+  },
+  "prefill_tps_metrics": 39.64,
+  "decisions": {
+   "subject": "cs(0.95)"
+  }
+ },
+ {
+  "label": "probe:6_noul_only",
+  "latency_ms": 16000.8,
+  "input_tokens": 615,
+  "metrics_delta": {
+   "prompt_tokens_total": 615.0,
+   "prompt_seconds_total": 15.995999999999981,
+   "tokens_predicted_total": 0.0,
+   "prompt_tokens_cached_total": 0.0
+  },
+  "prefill_tps_metrics": 38.45,
+  "decisions": {
+   "needs_notes": 0.519,
+   "needs_flashcards": 0.043,
+   "needs_quiz": 0.958,
+   "needs_podcast": 0.936,
+   "needs_video": 0.058,
+   "needs_code": 0.153
+  }
+ },
+ {
+  "label": "probe:long_state",
+  "latency_ms": 30779.6,
+  "input_tokens": 1117,
+  "metrics_delta": {
+   "prompt_tokens_total": 1117.0,
+   "prompt_seconds_total": 30.774,
+   "tokens_predicted_total": 0.0,
+   "prompt_tokens_cached_total": 0.0
+  },
+  "prefill_tps_metrics": 36.3,
+  "decisions": {
+   "needs_notes": 0.29,
+   "needs_flashcards": 0.017,
+   "needs_quiz": 0.941,
+   "needs_podcast": 0.958,
+   "needs_video": 0.066,
+   "needs_code": 0.536,
+   "subject": "cs(0.97)",
+   "difficulty": "0.99",
+   "video_style": "none(0.62)",
+   "voice_mode": "single_narrator(0.83)"
+  }
+ }
+]
