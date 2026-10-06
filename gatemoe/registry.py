@@ -39,6 +39,10 @@ def specialists(cfg: Config, pipeline=None) -> list[dict]:
             engines = []
         for eng in cfg.get("video.enabled_engines", []):
             out.append({"id": "video:" + eng, "gateway": "video", "available": eng in engines})
+        try:
+            out.append({"id": "handout:typst", "gateway": "handout", "available": pipeline.handout.available()})
+        except Exception:
+            pass
     ffmpeg = cfg.get("paths.ffmpeg", "ffmpeg")
     out.append({"id": "assembler:ffmpeg", "gateway": "video",
                 "available": bool(shutil.which(ffmpeg) or Path(ffmpeg).exists())})

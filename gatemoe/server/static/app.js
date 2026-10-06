@@ -197,6 +197,7 @@ function renderLesson(lesson) {
   if (lesson.video) tabs.push(["Video", () => videoView(lesson.video, lesson.video_render)]);
   if (lesson.code) tabs.push(["Code", () => codeView(lesson.code)]);
   if (lesson.sources) tabs.push(["Sources", () => sourcesView(lesson.sources)]);
+  tabs.push(["Downloads", () => downloadsView(lesson)]);
   if (lesson.errors && Object.keys(lesson.errors).length) tabs.push(["Issues", () => issuesView(lesson.errors)]);
   const nav = $("#tabs"); nav.replaceChildren();
   const show = (i) => {
@@ -288,6 +289,17 @@ function codeView(c) {
 function sourcesView(src) {
   if (!src.length) return el("p", { class: "muted", text: "No offline sources were found; content relies on the model's own knowledge." });
   return el("div", {}, src.map((s, i) => el("div", { class: "src" }, el("b", { text: `[${i + 1}] ${s.title || ""}` }), ` · ${s.zim || ""}`, el("p", { class: "muted", text: s.excerpt || "" }))));
+}
+function downloadsView(l) {
+  const items = [];
+  if (l.handout) items.push(["handout.pdf", "Printable handout (PDF): notes, flashcards, quiz + answer key"]);
+  if (l.notes) items.push(["notes.md", "Notes (Markdown)"]);
+  if (l.flashcards) items.push(["flashcards_anki.tsv", "Flashcards for Anki (TSV)"]);
+  if (l.podcast_audio) items.push([l.podcast_audio.audio, "Podcast audio"]);
+  if (l.video_render) items.push([l.video_render.video, "Video (MP4)"], [l.video_render.srt, "Subtitles (SRT)"]);
+  if (l.code) items.push(["example.py", "Python example"]);
+  items.push(["lesson.json", "Everything as JSON (incl. routing + metrics)"]);
+  return el("ul", {}, items.map(([f, label]) => el("li", {}, el("a", { href: fileUrl(f), download: f, text: label }))));
 }
 function issuesView(errs) {
   return el("div", {}, Object.entries(errs).map(([k, v]) => el("p", {}, el("b", { text: `${k}: ` }), el("span", { class: "err", text: v }))));

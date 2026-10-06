@@ -16,6 +16,7 @@ import time
 from pathlib import Path
 
 from .config import Config
+from .gateways.handout import HandoutGateway
 from .gateways.speech import SpeechGateway
 from .gateways.text import TextGateway
 from .gateways.video import VideoGateway
@@ -39,6 +40,7 @@ class LessonPipeline:
         self.kb = KnowledgeBase(cfg)
         self.speech = SpeechGateway(cfg)
         self.video = VideoGateway(cfg)
+        self.handout = HandoutGateway(cfg)
 
     def _pick_engine(self, wanted: str) -> str | None:
         engines = self.video.available_engines()
@@ -217,9 +219,16 @@ class LessonPipeline:
             except Exception as exc:
                 lesson["errors"]["video_render"] = f"{type(exc).__name__}: {exc}"
 
-        # 7. exports ---------------------------------------------------------------------------
+        # 7. exports: Markdown, Anki TSV and a printable Typst handout (no LLM time) ------------
         with ev.stage("package"):
             write_exports(lesson, out_dir)
+        if any(k in lesson for k in ("notes", "quiz", "flashcards")) and self.handout.available():
+            try:
+                with ev.stage("handout"):
+                    lesson["handout"] = self.handout.render(lesson, code, out_dir)
+                activated.append("handout:typst")
+            except Exception as exc:
+                lesson["errors"]["handout"] = f"{type(exc).__name__}: {exc}"
 
 
 def write_exports(lesson: dict, out_dir: Path) -> None:

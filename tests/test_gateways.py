@@ -64,3 +64,16 @@ def test_pack_sources_caps_length():
 def test_router_state_is_capped():
     s = build_state("word " * 500, "English", 100)
     assert len(s) < 140 and s.endswith("…")
+
+
+def test_handout_data_is_plain_and_safe():
+    from gatemoe.gateways.handout import _blocks, handout_data
+    lesson = {"request": "x", "notes": {"title": "**T** #import \"@preview/x\"", "sections": [
+        {"heading": "H", "body": "Intro **bold**\n- one\n- two\nEnd"}], "key_points": ["k"], "glossary": []},
+        "quiz": {"questions": [{"question": "q", "options": ["a", "b", "c", "d"], "answer_index": 5,
+                                "explanation": "e"}]}}
+    d = handout_data(lesson, {"font": "Noto Sans Kannada"}, "kn")
+    assert d["title"].startswith("T #import") and d["fonts"][0] == "Noto Sans Kannada"
+    assert d["quiz"][0]["answer_index"] == 1                   # always a valid option index
+    assert _blocks("a\n- b\n- c\nd") == [{"kind": "par", "text": "a"}, {"kind": "list", "items": ["b", "c"]},
+                                        {"kind": "par", "text": "d"}]
