@@ -53,8 +53,8 @@ router:
   threshold: 0.5           # a gateway fires when P(yes) >= threshold
   memo_cache: true         # identical (request, schema, model) -> reuse decision (exact match only)
   min_gateways: [notes]    # if nothing fires, run these
-  in_scope_min: 0.5        # below this the request is not a technical/scientific learning request: stop early
-                           # (measured: in-scope requests 0.90-0.95, off-topic ~0.007)
+  in_scope_min: 0.2        # below this the request is not a technical/scientific learning request: stop early
+                           # (measured: off-topic ~0.007; English in-scope 0.90-0.97, a Kannada one only 0.60)
   max_state_chars: 600     # learner text sent to Clef (prompt must fit one 2048-token micro-batch)
   # Compact schema: every token here is re-read on every call (Clef keeps no KV cache).
   gateways:
