@@ -25,7 +25,7 @@ TASKS = {
 Plan a short lesson. Give a clear title, 1-3 English search queries for an offline encyclopedia, \
 0-3 search queries in {lang_name} (empty if {lang_name} is English), 3-8 key terms and a 3-6 point outline.""",
     "notes": """Learner request: {request}
-Write study notes: 3-6 sections with a heading and a body (plain text with simple Markdown such as **bold** and - lists; formulas inline like F = m·a), \
+Write concise study notes: 3-4 sections with a heading and a short body (plain text with simple Markdown such as **bold** and - lists; formulas inline like F = m·a), \
 then 3-6 key points and a glossary of 2-8 terms.""",
     "flashcards": """Learner request: {request}
 Write exactly {n} flashcards. Front: one precise question or term. Back: a short, correct answer (one or two sentences).""",
@@ -34,6 +34,7 @@ Write exactly {n} multiple-choice questions, each with exactly 4 options, one co
 and a one-sentence explanation. Test understanding, not trivia.""",
     "podcast": """Learner request: {request}
 Write a two-host educational podcast script of about {n} turns. Host A is the curious learner, host B the expert; alternate A and B, starting with A.
+The hosts talk naturally: they never call themselves "Host A" or "Host B" and do not introduce themselves by label.
 The text will be read aloud by a speech synthesiser, so: write numbers, symbols, units and formulas the way they are spoken \
 (e.g. "F equals m times a", "nine point eight metres per second squared"); no code, no Markdown, no lists, no URLs, no emojis; \
 keep each turn to one to three short sentences.{spoken_rules}""",
@@ -43,7 +44,8 @@ with an explanation and the exact expected output. Code comments may be in {lang
     "video": """Learner request: {request}
 Plan a short explainer video of {n_min}-{n} beats. Each beat uses ONE template and fills only that template's slots:
 {templates}
-Rules: first beat 'title', last beat a recap ('bullets'{summary_hint}). On-screen text must be short (lines <= 8 words). \
+Rules: first beat 'title', last beat a recap ('bullets'{summary_hint}). Fill ONLY the slots of the chosen template. \
+On-screen text must be short (lines <= 8 words). \
 Equations use Typst math syntax (e.g. "f(x) = x^2", "(d)/(d x) x^2 = 2x", "integral_0^1 x dif x = 1/2", "a^2 + b^2 = c^2"). \
 Expressions for graphs use Python syntax in x (e.g. "x**2 - 1", "sin(x)"). \
 Narration: 1-3 spoken sentences per beat in {lang_name}, written exactly as it should be spoken (no symbols or code).{spoken_rules}""",

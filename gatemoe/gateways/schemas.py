@@ -14,7 +14,7 @@ VIDEO_TEMPLATES: dict[str, dict] = {
     "function_graph":   {"engines": ["manim"], "slots": "title, expression (in x, e.g. x**2 - 1), x_min, x_max, lines[0] = caption"},
     "array_steps":      {"engines": ["manim"], "slots": "title, values (sorted integers, 5-12), target (integer) - animates binary search"},
     "process_steps":    {"engines": ["hyperframes"], "slots": "title, lines (3-6 steps in order)"},
-    "bar_chart":        {"engines": ["hyperframes"], "slots": "title, labels (2-8), values (same count, numbers)"},
+    "bar_chart":        {"engines": ["hyperframes"], "slots": "title, labels (2-8 short category names, e.g. \"10 V\"), values (exactly one plain number per label), lines[0] = caption"},
     "code_walkthrough": {"engines": ["hyperframes"], "slots": "title, code (<= 14 lines), highlight (1-based line numbers)"},
     "definition":       {"engines": ["hyperframes"], "slots": "title = term, lines[0] = definition, lines[1:] = examples"},
 }
@@ -50,7 +50,7 @@ def plan_schema() -> dict:
 def notes_schema() -> dict:
     return _obj({
         "title": _str(120),
-        "sections": _arr(_obj({"heading": _str(100), "body": _str(900, 20)}), 3, 5),
+        "sections": _arr(_obj({"heading": _str(100), "body": _str(700, 20)}), 3, 4),
         "key_points": _arr(_str(160), 3, 6),
         "glossary": _arr(_obj({"term": _str(60), "definition": _str(200)}), 2, 6),
     })

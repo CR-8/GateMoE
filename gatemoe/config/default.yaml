@@ -86,7 +86,7 @@ generation:
   video_beats: 6
   max_tokens:
     plan: 400
-    notes: 1400
+    notes: 900
     flashcards: 900
     quiz: 1200
     podcast: 1400

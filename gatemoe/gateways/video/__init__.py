@@ -147,7 +147,9 @@ class VideoGateway:
         final = out_dir / "video.mp4"
         assemble(clips, durs, wavs, final, self.cfg["paths.ffmpeg"])
         write_subtitles(texts, durs, out_dir / "video.vtt", out_dir / "video.srt")
-        for c in clips:
-            c.unlink(missing_ok=True)
+        import shutil
+        shutil.rmtree(work, ignore_errors=True)
+        if narration:
+            shutil.rmtree(Path(narration[0]["wav"]).parent, ignore_errors=True)   # muxed into video.mp4
         return {"video": "video.mp4", "subtitles": "video.vtt", "srt": "video.srt",
                 "duration_s": round(sum(durs), 2), "engine": engine, "beats": report}
