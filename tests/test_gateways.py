@@ -77,3 +77,18 @@ def test_handout_data_is_plain_and_safe():
     assert d["quiz"][0]["answer_index"] == 1                   # always a valid option index
     assert _blocks("a\n- b\n- c\nd") == [{"kind": "par", "text": "a"}, {"kind": "list", "items": ["b", "c"]},
                                         {"kind": "par", "text": "d"}]
+
+
+def test_manim_beat_mapping_and_search_steps():
+    from gatemoe.gateways.video.manim_engine import beat_to_spec, binary_search_steps
+    s = beat_to_spec({"template": "array_steps", "title": "BS", "values": [9, 1, 5, 5, 3], "target": 5}, "kn")
+    assert s["type"] == "array_steps" and s["values"] == [1, 3, 5, 9] and s["lang"] == "kn"
+    assert s["steps"][-1].get("found") == [2]
+    miss = binary_search_steps([1, 3, 5, 9], 4)
+    assert "found" not in miss[-1] and len(miss) <= 12
+    g = beat_to_spec({"template": "function_graph", "title": "f", "expression": "x**2", "x_min": 5, "x_max": 1}, "en")
+    assert g["x_range"] == [-5.0, 5.0]                             # invalid range repaired
+    e = beat_to_spec({"template": "equation_steps", "title": "d", "equations": ["a", "", "b"], "lines": ["c1"]}, "en")
+    assert [st["math"] for st in e["steps"]] == ["a", "b"] and e["steps"][0]["caption"] == "c1"
+    b = beat_to_spec({"template": "bar_chart", "title": "x", "narration": "Only narration."}, "en")
+    assert b["type"] == "bullets" and b["bullets"] == ["Only narration."]
