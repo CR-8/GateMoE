@@ -1,0 +1,6 @@
+# GateMoE speech runtime (tested 2026-10-06 on x86_64 / Python 3.13; all have aarch64 wheels for cp311 + cp313)
+numpy            # 2.5.3 tested (needs Py>=3.12; pip picks 2.3.x on Bookworm's Python 3.11)
+onnxruntime==1.30.0
+sherpa-onnx==1.13.8      # zh voice (Apache-2.0; pulls sherpa-onnx-core)
+piper-tts==1.8.0         # te/ml/mr/bn Piper voices (GPL-3.0-or-later, bundles espeak-ng-data)
+num2words==0.5.14        # optional, number words for kn/te/bn (LGPL)

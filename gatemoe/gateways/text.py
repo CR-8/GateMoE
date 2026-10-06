@@ -36,7 +36,7 @@ and a one-sentence explanation. Test understanding, not trivia.""",
 Write a two-host educational podcast script of about {n} turns. Host A is the curious learner, host B the expert; alternate A and B, starting with A.
 The text will be read aloud by a speech synthesiser, so: write numbers, symbols, units and formulas the way they are spoken \
 (e.g. "F equals m times a", "nine point eight metres per second squared"); no code, no Markdown, no lists, no URLs, no emojis; \
-keep each turn to one to three short sentences.""",
+keep each turn to one to three short sentences.{spoken_rules}""",
     "code": """Learner request: {request}
 Write ONE short, self-contained, runnable Python 3 example (standard library only, no input(), no files, no network) that demonstrates the topic, \
 with an explanation and the exact expected output. Code comments may be in {lang_name}.""",
@@ -46,7 +46,7 @@ Plan a short explainer video of {n_min}-{n} beats. Each beat uses ONE template a
 Rules: first beat 'title', last beat a recap ('bullets'{summary_hint}). On-screen text must be short (lines <= 8 words). \
 Equations use Typst math syntax (e.g. "f(x) = x^2", "(d)/(d x) x^2 = 2x", "integral_0^1 x dif x = 1/2", "a^2 + b^2 = c^2"). \
 Expressions for graphs use Python syntax in x (e.g. "x**2 - 1", "sin(x)"). \
-Narration: 1-3 spoken sentences per beat in {lang_name}, written exactly as it should be spoken (no symbols or code).""",
+Narration: 1-3 spoken sentences per beat in {lang_name}, written exactly as it should be spoken (no symbols or code).{spoken_rules}""",
 }
 
 
@@ -66,8 +66,10 @@ def pack_sources(passages: list[dict], max_chars: int) -> str:
 
 
 class TextGateway:
-    def __init__(self, cfg: Config, gen: Generator, lang: str, decision: RouteDecision, request: str):
+    def __init__(self, cfg: Config, gen: Generator, lang: str, decision: RouteDecision, request: str,
+                 tts_engine: str | None = None):
         self.cfg = cfg
+        self.tts_engine = tts_engine
         self.gen = gen
         self.lang = lang
         self.info = cfg.language(lang)
@@ -83,6 +85,13 @@ class TextGateway:
                                     subject=self.decision.subject.replace("_", " "),
                                     level=self.decision.level, sources=self.sources)
         return [{"role": "system", "content": system}, {"role": "user", "content": task_text}]
+
+    def spoken_rules(self) -> str:
+        """Extra rules for text that a TTS engine will read (MMS/Piper drop digits and Latin words)."""
+        if self.lang == "en" or not self.tts_engine or self.tts_engine.startswith("supertonic"):
+            return ""
+        return (f" Because the {self.info['name']} voice cannot read digits or Latin letters, write every number as "
+                f"{self.info['name']} words and transliterate technical terms and abbreviations into {self.info['name']} script.")
 
     def _fmt(self, key: str, **extra) -> str:
         return TASKS[key].format(request=self.request, lang_name=self.info["name"], **extra)
@@ -106,7 +115,8 @@ class TextGateway:
                                       name="quiz", max_tokens=mt)
         if task == "podcast":
             n = int(self.cfg["generation.podcast_turns"])
-            return self.gen.chat_json(self._messages(self._fmt("podcast", n=n)), schemas.podcast_schema(n),
+            return self.gen.chat_json(self._messages(self._fmt("podcast", n=n, spoken_rules=self.spoken_rules())),
+                                      schemas.podcast_schema(n),
                                       name="podcast", max_tokens=mt)
         if task == "code":
             return self.gen.chat_json(self._messages(self._fmt("code")), schemas.code_schema(),
@@ -116,7 +126,8 @@ class TextGateway:
             n = int(self.cfg["generation.video_beats"])
             listing = "\n".join(f"- {t}: {VIDEO_TEMPLATES[t]['slots']}" for t in templates_for(engine))
             hint = " or 'definition'" if engine == "hyperframes" else ""
-            text = self._fmt("video", n=n, n_min=min(3, n), templates=listing, summary_hint=hint)
+            text = self._fmt("video", n=n, n_min=min(3, n), templates=listing, summary_hint=hint,
+                             spoken_rules=self.spoken_rules())
             return self.gen.chat_json(self._messages(text), schemas.video_schema(engine, n),
                                       name="video", max_tokens=mt)
         raise ValueError(f"unknown text task {task!r}")

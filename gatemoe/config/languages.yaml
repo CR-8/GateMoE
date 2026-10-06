@@ -1,20 +1,22 @@
 # Language registry: one entry per learner language.
-#   tts:   supertonic  -> Supertonic 3 (31 languages, 10 voices, two-host podcasts)
-#          sherpa:<dir> -> sherpa-onnx VITS model directory under speech.sherpa_dir (one voice;
-#                          speaker B is pitch-shifted)
-#          none        -> no audio for this language (text + video captions only)
+#   tts:   which offline voice engine speaks it (informational; the speech gateway routes by
+#          gateways/speech/podcast.py ENGINE_TABLE and uses the first installed candidate):
+#          supertonic = Supertonic 3 (31 languages, 10 voices, two real hosts)
+#          mms        = Meta MMS VITS exported to ONNX (one voice; host B pitch-shifted; CC-BY-NC)
+#          piper      = Piper voices via piper-tts (te, ml, mr, bn)
+#          sherpa     = sherpa-onnx (zh)
 #   font:  font family used for on-screen text (Manim / HyperFrames)
 #   iso3:  ISO 639-3 code as stored in Kiwix ZIM metadata ("Language")
 en: {name: English, native: English, iso3: eng, tts: supertonic, font: "Noto Sans"}
 hi: {name: Hindi, native: हिन्दी, iso3: hin, tts: supertonic, font: "Noto Sans Devanagari"}
-kn: {name: Kannada, native: ಕನ್ನಡ, iso3: kan, tts: "sherpa:vits-mms-kan", font: "Noto Sans Kannada"}
-ta: {name: Tamil, native: தமிழ், iso3: tam, tts: "sherpa:vits-mms-tam", font: "Noto Sans Tamil"}
-te: {name: Telugu, native: తెలుగు, iso3: tel, tts: "sherpa:vits-mms-tel", font: "Noto Sans Telugu"}
-bn: {name: Bengali, native: বাংলা, iso3: ben, tts: "sherpa:vits-mms-ben", font: "Noto Sans Bengali"}
-mr: {name: Marathi, native: मराठी, iso3: mar, tts: "sherpa:vits-mms-mar", font: "Noto Sans Devanagari"}
-ml: {name: Malayalam, native: മലയാളം, iso3: mal, tts: "sherpa:vits-mms-mal", font: "Noto Sans Malayalam"}
-gu: {name: Gujarati, native: ગુજરાતી, iso3: guj, tts: "sherpa:vits-mms-guj", font: "Noto Sans Gujarati"}
-pa: {name: Punjabi, native: ਪੰਜਾਬੀ, iso3: pan, tts: "sherpa:vits-mms-pan", font: "Noto Sans Gurmukhi"}
+kn: {name: Kannada, native: ಕನ್ನಡ, iso3: kan, tts: mms, font: "Noto Sans Kannada"}
+ta: {name: Tamil, native: தமிழ், iso3: tam, tts: mms, font: "Noto Sans Tamil"}
+te: {name: Telugu, native: తెలుగు, iso3: tel, tts: piper, font: "Noto Sans Telugu"}
+bn: {name: Bengali, native: বাংলা, iso3: ben, tts: piper, font: "Noto Sans Bengali"}
+mr: {name: Marathi, native: मराठी, iso3: mar, tts: piper, font: "Noto Sans Devanagari"}
+ml: {name: Malayalam, native: മലയാളം, iso3: mal, tts: piper, font: "Noto Sans Malayalam"}
+gu: {name: Gujarati, native: ગુજરાતી, iso3: guj, tts: mms, font: "Noto Sans Gujarati"}
+pa: {name: Punjabi, native: ਪੰਜਾਬੀ, iso3: pan, tts: mms, font: "Noto Sans Gurmukhi"}
 es: {name: Spanish, native: Español, iso3: spa, tts: supertonic, font: "Noto Sans"}
 fr: {name: French, native: Français, iso3: fra, tts: supertonic, font: "Noto Sans"}
 de: {name: German, native: Deutsch, iso3: deu, tts: supertonic, font: "Noto Sans"}
@@ -25,7 +27,7 @@ uk: {name: Ukrainian, native: Українська, iso3: ukr, tts: supertonic, 
 ar: {name: Arabic, native: العربية, iso3: ara, tts: supertonic, font: "Noto Sans Arabic"}
 ja: {name: Japanese, native: 日本語, iso3: jpn, tts: supertonic, font: "Noto Sans CJK JP"}
 ko: {name: Korean, native: 한국어, iso3: kor, tts: supertonic, font: "Noto Sans CJK KR"}
-zh: {name: Chinese, native: 中文, iso3: zho, tts: none, font: "Noto Sans CJK SC"}
+zh: {name: Chinese, native: 中文, iso3: zho, tts: sherpa, font: "Noto Sans CJK SC"}
 id: {name: Indonesian, native: Bahasa Indonesia, iso3: ind, tts: supertonic, font: "Noto Sans"}
 vi: {name: Vietnamese, native: Tiếng Việt, iso3: vie, tts: supertonic, font: "Noto Sans"}
 tr: {name: Turkish, native: Türkçe, iso3: tur, tts: supertonic, font: "Noto Sans"}

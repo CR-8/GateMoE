@@ -86,6 +86,14 @@ class LessonPipeline:
         lesson["route"] = decision.to_dict()
         if decision.mode == "clef":
             activated.append("router:clef-flash")
+        in_min = float(cfg.get("router.in_scope_min", 0) or 0)
+        if decision.mode == "clef" and decision.in_scope is not None and decision.in_scope < in_min:
+            # conditional computation at its cheapest: no generator, TTS or video is loaded at all
+            lesson["out_of_scope"] = True
+            lesson["errors"]["scope"] = (f"This does not look like a request to learn a technical or scientific topic "
+                                         f"(router P(in scope) = {decision.in_scope:.2f}). Rephrase it, or pick the "
+                                         f"gateways manually.")
+            return
         selected = [g for g in TEXT_ORDER if g in decision.selected]
         engine = self._pick_engine(decision.video_engine) if "video" in selected else None
         if "video" in selected and engine is None:
@@ -99,24 +107,37 @@ class LessonPipeline:
         gen = Generator(server.base_url, timeout=float(cfg["models.generator.request_timeout_s"]),
                         temperature=float(cfg["models.generator.temperature"]),
                         disable_thinking=bool(cfg["models.generator.disable_thinking"]), events=ev)
-        tg = TextGateway(cfg, gen, code, decision, request)
-        with ev.stage("plan"):
-            plan = tg.plan()
+        tts_engine = self.speech.engine_for(code)
+        tg = TextGateway(cfg, gen, code, decision, request, tts_engine=tts_engine)
+        try:
+            with ev.stage("plan"):
+                plan = tg.plan()
+        except Cancelled:
+            raise
+        except Exception as exc:
+            lesson["errors"]["plan"] = f"{type(exc).__name__}: {exc}"
+            plan = {"title": request[:100], "search_queries_en": [], "search_queries_native": [request[:80]],
+                    "key_terms": [], "outline": []}
         lesson["plan"] = plan
 
         passages: list[dict] = []
         if cfg["knowledge.enabled"]:
-            with ev.stage("retrieve") as st:
-                queries = [(q, "en") for q in plan.get("search_queries_en", [])]
-                queries += [(q, code) for q in plan.get("search_queries_native", [])]
-                if not queries:
-                    queries = [(request, code)]
-                passages = self.kb.search(queries, learner_lang=code, subject=decision.subject, events=ev)
-                st.update(passages=len(passages), zims=sorted({p.get("zim", "") for p in passages}))
+            try:
+                with ev.stage("retrieve") as st:
+                    queries = [(q, "en") for q in plan.get("search_queries_en", [])]
+                    queries += [(q, code) for q in plan.get("search_queries_native", [])]
+                    if not queries:
+                        queries = [(request, code)]
+                    passages = self.kb.search(queries, learner_lang=code, subject=decision.subject, events=ev)
+                    st.update(passages=len(passages), zims=sorted({p.get("zim", "") for p in passages}))
+            except Cancelled:
+                raise
+            except Exception as exc:
+                lesson["errors"]["retrieve"] = f"{type(exc).__name__}: {exc}"
             for z in sorted({p.get("zim", "") for p in passages if p.get("zim")}):
                 activated.append("knowledge:" + z)
-        lesson["sources"] = [{k: p.get(k) for k in ("title", "zim", "path", "lang", "score")} | {"excerpt": (p.get("text") or "")[:400]}
-                             for p in passages]
+        lesson["sources"] = [{**{k: p.get(k) for k in ("title", "zim", "path", "lang", "score")},
+                              "excerpt": (p.get("text") or "")[:400]} for p in passages]
         tg.set_sources(passages)
 
         for task in selected:
@@ -134,7 +155,6 @@ class LessonPipeline:
             self.models.unload(ev)
 
         # 5. speech ----------------------------------------------------------------------------
-        tts_engine = self.speech.engine_for(code)
         narration = None
         try:
             if "podcast" in lesson and tts_engine:

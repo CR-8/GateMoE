@@ -40,7 +40,9 @@ models:
     file: Qwen3.5-4B-Q4_0.gguf
     port: 8081
     ctx: 8192
-    args: ["-np", "1", "--jinja"]
+    # --reasoning off: Qwen3.5 thinks by default (+300 tokens per answer). --cache-ram 0 and
+    # --ctx-checkpoints 4 keep RSS ~3.3 GB while prefix reuse across gateways still works.
+    args: ["-np", "1", "--jinja", "--reasoning", "off", "--cache-ram", "0", "--ctx-checkpoints", "4"]
     request_timeout_s: 3600
     temperature: 0.4
     # Qwen3.5 "thinking" is switched off per request (chat_template_kwargs.enable_thinking=false).
@@ -51,6 +53,9 @@ router:
   threshold: 0.5           # a gateway fires when P(yes) >= threshold
   memo_cache: true         # identical (request, schema, model) -> reuse decision (exact match only)
   min_gateways: [notes]    # if nothing fires, run these
+  in_scope_min: 0.5        # below this the request is not a technical/scientific learning request: stop early
+                           # (measured: in-scope requests 0.90-0.95, off-topic ~0.007)
+  max_state_chars: 600     # learner text sent to Clef (prompt must fit one 2048-token micro-batch)
   # Compact schema: every token here is re-read on every call (Clef keeps no KV cache).
   gateways:
     notes: "Make written study notes?"
@@ -89,13 +94,13 @@ generation:
     video: 1400
 
 speech:
-  supertonic_dir: ${paths.models_dir}/supertonic-3   # contains onnx/ and voice_styles/
-  steps: 5                 # 5 flow steps: ~3.5% WER; 2 steps was 32% WER in our tests
+  models_dir: ${paths.models_dir}/speech   # supertonic3/ mms/ piper/ sherpa/ (scripts/fetch_speech_models.sh)
+  steps: 5                 # Supertonic flow steps: 5 -> ~3.5% WER; 2 steps was 32% WER in our tests
   speed: 1.0
-  threads: 4
-  voices: {A: F2, B: M1}   # two hosts for the podcast; narrator uses A
-  sherpa_dir: ${paths.models_dir}/sherpa-tts         # fallback engine models for languages Supertonic lacks
-  speaker_b_pitch: 0.89    # single-voice engines: speaker B is pitch-shifted by this factor
+  threads: 4               # TTS runs only after the LLM is unloaded (4 threads under contention is slower than 2)
+  voices: {A: F2, B: M1}   # Supertonic hosts; single-voice engines pitch-shift host B by 3 semitones
+  supertonic_variant: fp32 # or int8 (k2-fsa quantised vector estimator + vocoder, -254 MB)
+  format: mp3
   bitrate: 64k
 
 video:

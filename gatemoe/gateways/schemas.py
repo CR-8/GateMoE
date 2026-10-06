@@ -50,28 +50,28 @@ def plan_schema() -> dict:
 def notes_schema() -> dict:
     return _obj({
         "title": _str(120),
-        "sections": _arr(_obj({"heading": _str(100), "body": _str(1200, 20)}), 3, 6),
-        "key_points": _arr(_str(200), 3, 6),
-        "glossary": _arr(_obj({"term": _str(60), "definition": _str(240)}), 2, 8),
+        "sections": _arr(_obj({"heading": _str(100), "body": _str(900, 20)}), 3, 5),
+        "key_points": _arr(_str(160), 3, 6),
+        "glossary": _arr(_obj({"term": _str(60), "definition": _str(200)}), 2, 6),
     })
 
 
 def flashcards_schema(n: int) -> dict:
-    return _obj({"cards": _arr(_obj({"front": _str(200), "back": _str(320)}), n, n)})
+    return _obj({"cards": _arr(_obj({"front": _str(100), "back": _str(180)}), n, n)})
 
 
 def quiz_schema(n: int) -> dict:
     q = _obj({
-        "question": _str(300),
-        "options": _arr(_str(160), 4, 4),
+        "question": _str(240),
+        "options": _arr(_str(120), 4, 4),
         "answer_index": {"type": "integer", "minimum": 0, "maximum": 3},
-        "explanation": _str(400),
+        "explanation": _str(300),
     })
     return _obj({"questions": _arr(q, n, n)})
 
 
 def podcast_schema(n: int) -> dict:
-    turn = _obj({"speaker": {"type": "string", "enum": ["A", "B"]}, "text": _str(420)})
+    turn = _obj({"speaker": {"type": "string", "enum": ["A", "B"]}, "text": _str(300)})
     return _obj({"title": _str(120), "turns": _arr(turn, max(4, n - 2), n + 2)})
 
 
@@ -89,7 +89,7 @@ def video_schema(engine: str, max_beats: int) -> dict:
     beat = _obj({
         "template": {"type": "string", "enum": templates_for(engine)},
         "title": _str(90),
-        "narration": _str(420),
+        "narration": _str(300),
         "lines": _arr(_str(140), 0, 6),
         "equations": _arr(_str(120), 0, 4),
         "expression": _str(80, 0),

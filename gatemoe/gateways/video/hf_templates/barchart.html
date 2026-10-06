@@ -1,0 +1,107 @@
+<!doctype html>
+<!-- GateMoE template: vertical bar chart with grow + number count-up (1-8 bars, values >= 0).
+     Animation ends <= 3.0 s then holds.
+     payload = {"heading":str, "bars":[{"label":str, "value":number}], "unit":str?, "decimals":int?,
+                "caption":str?, "footer":str?, "highlight":int?, "lang":"en", "dir":"ltr"|"rtl"} -->
+<html lang="en" data-composition-variables='[{"id":"payload","type":"string","label":"Scene payload (JSON)","default":"{\"heading\":\"Chart\",\"bars\":[{\"label\":\"A\",\"value\":3},{\"label\":\"B\",\"value\":5},{\"label\":\"C\",\"value\":2}]}"}]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1280, height=720" />
+    <link rel="stylesheet" href="assets/base.css" />
+    <script src="assets/gsap.min.js"></script>
+    <script src="assets/gm.js"></script>
+    <style>
+      #stage { display: flex; flex-direction: column; padding: 52px 88px 76px; gap: 10px; }
+      #heading { font-size: 44px; font-weight: 700; line-height: 1.3; }
+      #caption { font-size: 24px; color: var(--gm-muted); line-height: 1.4; }
+      #plot { position: relative; flex: 1; min-height: 0; margin-top: 12px; }
+      #axis { position: absolute; left: 0; right: 0; bottom: 86px; height: 3px; background: #475569; }
+      #bars { position: absolute; left: 0; right: 0; top: 0; bottom: 0; display: flex; gap: 28px; padding: 0 12px; }
+      .col { flex: 1 1 0; min-width: 0; position: relative; }
+      .bar { position: absolute; left: 10%; right: 10%; bottom: 89px; border-radius: 10px 10px 0 0;
+             background: linear-gradient(180deg, #38bdf8, #0284c7); }
+      .bar.hi { background: linear-gradient(180deg, #fbbf24, #d97706); }
+      .val { position: absolute; left: -20px; right: -20px; text-align: center; font-weight: 700; font-size: 28px;
+             font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; line-height: 1.3; }
+      .lab { position: absolute; left: -10px; right: -10px; bottom: 0; height: 78px; text-align: center; font-size: 22px;
+             line-height: 1.3; color: var(--gm-fg); overflow: hidden; overflow-wrap: anywhere; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="4" data-width="1280" data-height="720">
+      <div id="stage" class="clip">
+        <div id="heading"></div>
+        <div id="caption"></div>
+        <div id="plot"><div id="axis"></div><div id="bars"></div></div>
+      </div>
+      <div id="footer" class="gm-footer"></div>
+    </div>
+    <script>
+      (function () {
+        var p = GM.payload();
+        GM.setLang(p);
+        var bars = (Array.isArray(p.bars) ? p.bars : []).slice(0, 8).map(function (b) {
+          var v = Number(b && b.value);
+          return { label: b && b.label, value: isFinite(v) && v > 0 ? v : 0 };
+        });
+        var dec = Number.isInteger(p.decimals) ? Math.max(0, Math.min(3, p.decimals)) :
+                  (bars.some(function (b) { return Math.round(b.value) !== b.value; }) ? 1 : 0);
+        var unit = p.unit ? String(p.unit) : "";
+        var gap = (!unit || /^[%°′″]/.test(unit)) ? "" : "\u2009";   // "12 m/s²" but "74%" and "30°"
+        var fmt = function (x) {
+          return x.toLocaleString(p.lang || "en", { minimumFractionDigits: dec, maximumFractionDigits: dec }) + gap + unit;
+        };
+        GM.text(document.getElementById("heading"), p.heading);
+        var cap = document.getElementById("caption");
+        GM.text(cap, p.caption); if (!p.caption) cap.style.display = "none";
+        GM.text(document.getElementById("footer"), p.footer);
+        var maxV = Math.max.apply(null, bars.map(function (b) { return b.value; }).concat([1e-9]));
+        var holder = document.getElementById("bars");
+        var counters = [];
+        bars.forEach(function (b, i) {
+          var col = GM.el("div", "col");
+          var bar = GM.el("div", "bar" + (p.highlight === i ? " hi" : ""));
+          bar.style.height = "0px";
+          var val = GM.el("div", "val", fmt(0));
+          val.style.bottom = "97px";
+          col.appendChild(bar); col.appendChild(val); col.appendChild(GM.el("div", "lab", b.label));
+          holder.appendChild(col);
+          counters.push({ el: val, bar: bar, h: 0, v: b.value });
+        });
+        GM.layout(function () {
+          GM.fit(document.getElementById("heading"), document.getElementById("heading"), 44, 28);
+          document.querySelectorAll(".lab").forEach(function (l) { GM.fit(l, l, 22, 12); });
+          // bar pixel heights come from the real plot height (measured after fonts/heading are final)
+          var maxBarPx = document.getElementById("plot").clientHeight - 89 - 48;
+          counters.forEach(function (c) {
+            c.h = Math.max(0, Math.round(maxBarPx * c.v / maxV));
+            GM.text(c.el, fmt(c.v)); GM.fit(c.el, c.el, 28, 12, true); GM.text(c.el, fmt(0)); // size for the FINAL number
+          });
+        }, [p.heading, p.caption, p.footer, unit, "0123456789.,"].concat(bars.map(function (b) { return b.label; })).join(" "));
+
+        var tl = gsap.timeline({ paused: true });
+        tl.fromTo("#heading", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.1);
+        tl.fromTo("#caption", { opacity: 0 }, { opacity: 1, duration: 0.5 }, 0.3);
+        tl.fromTo("#axis", { scaleX: 0, transformOrigin: "0% 50%" }, { scaleX: 1, duration: 0.5, ease: "power2.out" }, 0.3);
+        tl.fromTo(".lab", { opacity: 0 }, { opacity: 1, duration: 0.4, stagger: 0.05 }, 0.5);
+        var n = Math.max(counters.length, 1), stag = Math.min(0.15, 0.8 / n);
+        counters.forEach(function (c, i) {
+          var t = 0.8 + i * stag, d = 1.6;  // ends by 0.8 + 0.8 + 1.6 = 3.2 worst case -> clamp
+          if (t + d > 3.0) d = 3.0 - t;
+          var o = { k: 0 };
+          // count-up is driven by the (seekable) timeline: onUpdate fires on every seek
+          tl.to(o, { k: 1, duration: d, ease: "power2.out", onUpdate: function () {
+            c.bar.style.height = Math.round(c.h * o.k) + "px";
+            c.el.style.bottom = (89 + Math.round(c.h * o.k) + 8) + "px";
+            GM.text(c.el, fmt(c.v * o.k));
+          } }, t);
+          tl.fromTo(c.el, { opacity: 0 }, { opacity: 1, duration: 0.3 }, t);
+        });
+        tl.fromTo("#footer", { opacity: 0 }, { opacity: 1, duration: 0.5 }, 0.6);
+        window.__timelines = window.__timelines || {};
+        window.__timelines["main"] = tl;   // static registration (the linter looks for this literal)
+        window.__gmTimeline = tl;          // used by tools/fallback_render.mjs
+      })();
+    </script>
+  </body>
+</html>
