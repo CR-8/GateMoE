@@ -39,6 +39,18 @@ export GATEMOE_CONFIG=/mnt/hdd/gatemoe/gatemoe.yaml
 
 Full instructions: [docs/PI_SETUP.md](docs/PI_SETUP.md).
 
+## Quick start (cloud VM, e.g. AWS EC2)
+
+Any Ubuntu/Debian VM with **at least 8 GB RAM** (t3.xlarge / m7i.xlarge recommended; a t3.micro is
+too small) and 30 GB disk:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/CR-8/GateMoE/main/scripts/install_cloud.sh | sudo bash
+```
+
+It installs everything, downloads the models and offline knowledge, sets a login password and
+starts the web app as a service. Details, instance sizes and access options: [docs/CLOUD.md](docs/CLOUD.md).
+
 ## Commands
 
 | Command | What it does |
@@ -59,6 +71,7 @@ Full instructions: [docs/PI_SETUP.md](docs/PI_SETUP.md).
 * [docs/RESEARCH_FINDINGS.md](docs/RESEARCH_FINDINGS.md) — what was researched/measured before building (Clef-flash on CPU, Kiwix sizes, TTS, video, prior work) and the honest contribution
 * [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) — research questions and how to run them
 * [docs/PI_SETUP.md](docs/PI_SETUP.md) — install, memory settings, troubleshooting
+* [docs/CLOUD.md](docs/CLOUD.md) — one-command install on a cloud VM (AWS EC2 sizes, access, operations)
 * [docs/EXTENDING.md](docs/EXTENDING.md) — plug in more voices (Fish Audio, Kokoro, …), video templates, ZIMs, languages
 * [docs/NEXT_STEPS.md](docs/NEXT_STEPS.md) — handover: current state, how to set up a session, prioritised open work
 * [research/](research/) — the multi-agent research/verification workflows, raw reports and the Clef CPU benchmark

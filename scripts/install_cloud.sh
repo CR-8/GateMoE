@@ -32,6 +32,9 @@ GSAP_VERSION="${GSAP_VERSION:-3.15.0}"
 PLAYWRIGHT_VERSION="${PLAYWRIGHT_VERSION:-1.56}"
 SVC_USER=gatemoe
 export DEBIAN_FRONTEND=noninteractive
+# re-runs: the checkouts belong to the service user, so root's git would refuse them ("dubious
+# ownership"); trust them for this script's git commands only
+export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0='*'
 
 log()  { printf '\n\033[1;34m== %s\033[0m\n' "$*"; }
 imds() {  # EC2 instance metadata (IMDSv2); prints nothing on other clouds / errors
