@@ -44,7 +44,11 @@ wikipedia_en_computer_nopic wikipedia_en_medicine_nopic wikipedia_hi_all_nopic w
 phet_en_all phet_hi_all phet_kn_all}"
 if [ "${SKIP_ZIMS:-0}" != 1 ]; then
   for prefix in $ZIMS; do
-    project="${prefix%%_*}"                                   # wikipedia, wikibooks, libretexts, ...
+    case "$prefix" in                                         # Kiwix folder for this archive
+      libretexts.org_*) project=libretexts ;;
+      *.stackexchange.com_*|stackoverflow.com_*|*.stackoverflow.com_*) project=stack_exchange ;;
+      *) project="${prefix%%_*}" ;;                           # wikipedia, wikibooks, phet, devdocs, ...
+    esac
     listing="$(curl -fsSL "https://download.kiwix.org/zim/${project}/")" || { echo "skip $prefix (listing failed)"; continue; }
     file="$(printf '%s' "$listing" | grep -o "${prefix}_[0-9]\{4\}-[0-9]\{2\}\.zim" | sort -u | tail -1)"
     if [ -z "$file" ]; then echo "skip $prefix (not found)"; continue; fi
