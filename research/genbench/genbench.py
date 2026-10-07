@@ -34,18 +34,21 @@ from gatemoe.runtime.llama_server import LlamaServer  # noqa: E402
 from gatemoe.runtime.model_manager import ModelManager  # noqa: E402
 
 
-def variants(draft_model: str | None, threads: int) -> dict[str, list[str]]:
+def variants(draft_model: str | None, threads: int) -> dict[str, tuple[list[str], dict]]:
+    """name -> (extra llama-server args, Generator options)"""
     v = {
-        "baseline": [],
-        "ngram-simple": ["--spec-type", "ngram-simple"],
-        "ngram-map-k": ["--spec-type", "ngram-map-k"],
-        "ngram-mod": ["--spec-type", "ngram-mod"],
-        "ngram-cache": ["--spec-type", "ngram-cache"],
+        "baseline": ([], {}),
+        "compact": ([], {"compact_json": True, "json_spaces": True}),          # GBNF: ": " / ", " only
+        "compact-nospace": ([], {"compact_json": True, "json_spaces": False}),  # GBNF: no whitespace at all
+        "ngram-simple": (["--spec-type", "ngram-simple"], {}),
+        "ngram-map-k": (["--spec-type", "ngram-map-k"], {}),
+        "ngram-mod": (["--spec-type", "ngram-mod"], {}),
+        "ngram-cache": (["--spec-type", "ngram-cache"], {}),
     }
     if draft_model:
         for n in (2, 4, 6):
-            v[f"draft-0.8b-n{n}"] = ["--spec-type", "draft-simple", "-md", draft_model, "--spec-draft-n-max", str(n),
-                                     "-td", str(threads)]
+            v[f"draft-0.8b-n{n}"] = (["--spec-type", "draft-simple", "-md", draft_model, "--spec-draft-n-max", str(n),
+                                      "-td", str(threads)], {})
     return v
 
 
@@ -63,7 +66,9 @@ def build_gateway(cfg, lesson: dict, gen: Generator, kb: KnowledgeBase) -> tuple
     return tg, passages
 
 
-def run_variant(cfg, name: str, extra: list[str], lesson: dict, tasks: list[str], kb, log_dir: Path) -> dict:
+def run_variant(cfg, name: str, spec: tuple[list[str], dict], lesson: dict, tasks: list[str], kb,
+                log_dir: Path) -> dict:
+    extra, gen_opts = spec
     mm = ModelManager(cfg)
     argv = mm.argv("generator") + extra
     srv = LlamaServer(name="generator", argv=argv, host=cfg["llama.host"], port=int(cfg["models.generator.port"]),
@@ -73,12 +78,12 @@ def run_variant(cfg, name: str, extra: list[str], lesson: dict, tasks: list[str]
         load_s = srv.start()
     except Exception as exc:
         return {"variant": name, "args": extra, "error": f"start: {exc}"[:600]}
-    rec = {"variant": name, "args": extra, "load_s": round(load_s, 2), "tasks": {}}
+    rec = {"variant": name, "args": extra, "generator_options": gen_opts, "load_s": round(load_s, 2), "tasks": {}}
     try:
         ev = EventLog(None)
         gen = Generator(srv.base_url, timeout=float(cfg["models.generator.request_timeout_s"]),
                         temperature=float(cfg["models.generator.temperature"]),
-                        disable_thinking=bool(cfg["models.generator.disable_thinking"]), events=ev)
+                        disable_thinking=bool(cfg["models.generator.disable_thinking"]), events=ev, **gen_opts)
         tg, passages = build_gateway(cfg, lesson, gen, kb)
         rec["passages"] = [p["title"] for p in passages]
         for task in tasks:
@@ -91,6 +96,20 @@ def run_variant(cfg, name: str, extra: list[str], lesson: dict, tasks: list[str]
                 out, err = None, f"{type(exc).__name__}: {exc}"[:400]
             calls = [e for e in ev.events[n0:] if e["kind"] == "llm_call"]
             gen_n = sum(c.get("predicted_n") or 0 for c in calls)
+            # how many of the last call's tokens were layout whitespace: compare with the same
+            # object serialised compactly, counted by the server's own tokenizer
+            ws = None
+            if out is not None and calls:
+                try:
+                    from gatemoe.runtime.http import post_json
+                    compact = json.dumps(out, ensure_ascii=False, separators=(",", ":"))
+                    ntok = len(post_json(srv.base_url + "/tokenize", {"content": compact}).get("tokens", []))
+                    raw = gen.last_content
+                    ws = {"last_call_tokens": calls[-1].get("predicted_n"), "compact_tokens": ntok,
+                          "raw_chars": len(raw), "compact_chars": len(compact),
+                          "newlines": raw.count("\n")}
+                except Exception as exc:
+                    ws = {"error": str(exc)[:200]}
             rec["tasks"][task] = {
                 "wall_s": round(time.perf_counter() - t, 2), "calls": len(calls), "generated": gen_n,
                 "prompt_n": sum(c.get("prompt_n") or 0 for c in calls),
@@ -99,6 +118,7 @@ def run_variant(cfg, name: str, extra: list[str], lesson: dict, tasks: list[str]
                 "draft_n": sum(c.get("draft_n") or 0 for c in calls),
                 "draft_accepted": sum(c.get("draft_accepted") or 0 for c in calls),
                 "finish": [c.get("finish") for c in calls], "error": err, "output": out,
+                "predicted": [c.get("predicted_n") for c in calls], "whitespace": ws,
             }
             print(f"  {name:>16} {task:<10} {rec['tasks'][task]['wall_s']:7.1f}s gen={gen_n:5d} "
                   f"tps={rec['tasks'][task]['gen_tps']} draft={rec['tasks'][task]['draft_accepted']}/"

@@ -46,12 +46,12 @@ findings ...") except: podcast TTS checks for cancel only between lessons stages
 
 ### B. Optimisation work (deep, measured)
 
-1. **Generator speed (largest lever).** Try llama.cpp speculative decoding with a small draft model
-   from the same family (`--model-draft`, `--draft-max/min`) and draftless n-gram/lookup decoding;
-   JSON outputs repeat keys and source phrases, so acceptance should be high. Measure tok/s and
-   end-to-end gateway time on the same prompts; check the extra RAM on the 8 GB Pi.
-2. **Grammar cost.** Measure tokens/s with and without `json_schema` on the same prompts (grammar
-   sampling is single-threaded on CPU); simplify schemas if it matters.
+1. **Generator speed.** Done on x86 (see `research/genbench/README.md`): compact-JSON grammar (one optional
+   space after ':' and ',', no newlines) is now the default (-42 % English, -18 % Kannada generation time); draft-model speculation with
+   Qwen3.5-0.8B accepted 71 % of tokens but ran slower (6.2 vs 7.0 t/s) and n-gram lookup accepted 7 %.
+   Next: repeat `genbench --variants baseline,compact,draft-0.8b-n2,draft-0.8b-n4` on the Pi 5
+   (memory-bound decode may change the speculation result), and with more requests per task.
+2. **Grammar cost.** Measured: the custom grammar samples at the same tok/s as json_schema.
 3. **Router prompt size vs quality.** The schema is 92 % of Clef's prompt and cannot be cached.
    Build a small labelled request set (EN + Indic), then ablate question wording/count and quantisation
    (Q4_0 / IQ4_NL / Q3_K) for latency vs decision F1.

@@ -49,6 +49,9 @@ models:
     temperature: 0.4
     # Qwen3.5 "thinking" is switched off per request (chat_template_kwargs.enable_thinking=false).
     disable_thinking: true
+    # Constrain output with GateMoE's own GBNF (no indentation/newlines between JSON tokens) instead of
+    # llama-server's json_schema conversion, which lets the model pretty-print. See research/genbench.
+    compact_json: true          # measured (x86): -42 % generation time (English lesson), -18 % (Kannada)
 
 router:
   mode: clef               # clef = Clef-flash decides; all = every gateway (baseline); manual = user picks

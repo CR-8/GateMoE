@@ -1,0 +1,1046 @@
+{
+ "runs": [
+  {
+   "variant": "baseline",
+   "args": [],
+   "load_s": 2.11,
+   "tasks": {
+    "notes": {
+     "wall_s": 311.33,
+     "calls": 2,
+     "generated": 2027,
+     "prompt_n": 1332,
+     "cached": 1324,
+     "gen_tps": [
+      6.74,
+      7.03
+     ],
+     "prompt_tps": [
+      81.77,
+      12.69
+     ],
+     "draft_n": 0,
+     "draft_accepted": 0,
+     "finish": [
+      "length",
+      "stop"
+     ],
+     "error": null,
+     "output": {
+      "title": "Ohm's Law: The Foundation of Electronics",
+      "sections": [
+       {
+        "heading": "What is Ohm's Law?",
+        "body": "Ohm's Law describes the relationship between voltage, current, and resistance in a conductor. It states that current is directly proportional to voltage and inversely proportional to resistance. For a linear resistor, the resistance remains constant regardless of the applied voltage or current."
+       },
+       {
+        "heading": "The Three Key Formulas",
+        "body": "There are three ways to calculate values using Ohm's Law:\n- **Current**: I = V / R\n- **Voltage**: V = I · R\n- **Resistance**: R = V / I\nWhere I is current (Amperes), V is voltage (Volts), and R is resistance (Ohms)."
+       },
+       {
+        "heading": "Power and Heat",
+        "body": "When current flows through a resistor, electrical energy is converted into heat. The power dissipated (P) can be calculated using:\n- P = V · I\n- P = I² · R\n- P = V² / R\nThis is why resistors get hot and why power ratings matter in circuit design."
+       },
+       {
+        "heading": "Linear vs. Non-Linear Resistors",
+        "body": "Most standard resistors are 'linear,' meaning their resistance value stays constant even if voltage or current changes. However, some components like thermistors are 'non-linear'; their resistance changes significantly with temperature or voltage, so the simple Ohm's Law formulas do not apply directly without modification."
+       }
+      ],
+      "key_points": [
+       "Current flows from high voltage to low voltage through a resistor.",
+       "Resistance opposes the flow of current.",
+       "The unit of resistance is the Ohm (Ω).",
+       "Power dissipation causes resistors to generate heat.",
+       "Ohm's Law applies primarily to linear resistors in DC circuits.",
+       "Non-ohmic materials (like thermistors) have changing resistance."
+      ],
+      "glossary": [
+       {
+        "term": "Voltage",
+        "definition": "The electrical potential difference between two points, measured in Volts (V)."
+       },
+       {
+        "term": "Current",
+        "definition": "The rate of flow of electric charge through a conductor, measured in Amperes (A)."
+       },
+       {
+        "term": "Resistance",
+        "definition": "The opposition to current flow in a conductor, measured in Ohms (Ω)."
+       },
+       {
+        "term": "Power",
+        "definition": "The rate at which electrical energy is converted to other forms (like heat), measured in Watts (W)."
+       },
+       {
+        "term": "Linear Resistor",
+        "definition": "A resistor whose value remains constant over a range of voltages and currents."
+       },
+       {
+        "term": "Non-ohmic",
+        "definition": "A material or component where resistance changes with voltage or current."
+       }
+      ],
+      "concept_map": [
+       {
+        "from": "Voltage",
+        "label": "drives",
+        "to": "Current"
+       },
+       {
+        "from": "Current",
+        "label": "flows through",
+        "to": "Resistor"
+       },
+       {
+        "from": "Resistor",
+        "label": "opposes",
+        "to": "Current"
+       },
+       {
+        "from": "Voltage",
+        "label": "equals",
+        "to": "Current × Resistance"
+       },
+       {
+        "from": "Current",
+        "label": "squared times",
+        "to": "Resistance"
+       },
+       {
+        "from": "Result",
+        "label": "is Power",
+        "to": "Heat"
+       },
+       {
+        "from": "Power",
+        "label": "is measured in",
+        "to": "Watts"
+       },
+       {
+        "from": "Resistance",
+        "label": "is measured in",
+        "to": "Ohms"
+       },
+       {
+        "from": "Ohm's Law",
+        "label": "applies to",
+        "to": "Linear Resistors"
+       },
+       {
+        "from": "Thermistor",
+        "label": "is a type of",
+        "to": "Non-ohmic"
+       }
+      ]
+     },
+     "predicted": [
+      1100,
+      927
+     ],
+     "whitespace": {
+      "last_call_tokens": 927,
+      "compact_tokens": 685,
+      "raw_chars": 3346,
+      "compact_chars": 2999,
+      "newlines": 48
+     }
+    },
+    "quiz": {
+     "wall_s": 92.8,
+     "calls": 1,
+     "generated": 613,
+     "prompt_n": 414,
+     "cached": 812,
+     "gen_tps": [
+      7.02
+     ],
+     "prompt_tps": [
+      73.64
+     ],
+     "draft_n": 0,
+     "draft_accepted": 0,
+     "finish": [
+      "stop"
+     ],
+     "error": null,
+     "output": {
+      "questions": [
+       {
+        "question": "According to Ohm's law, if the voltage across a linear resistor is doubled while the resistance remains constant, what happens to the current?",
+        "options": [
+         "It doubles.",
+         "It is halved.",
+         "It quadruples.",
+         "It remains unchanged."
+        ],
+        "answer_index": 0,
+        "explanation": "Ohm's law states that current is directly proportional to voltage, so doubling the voltage doubles the current."
+       },
+       {
+        "question": "In the context of Ohm's law, what is the standard SI unit for resistance?",
+        "options": [
+         "Siemens (S)",
+         "Volt (V)",
+         "Ampere (A)",
+         "Ohm (Ω)"
+        ],
+        "answer_index": 3,
+        "explanation": "The ohm is the SI derived unit of resistance, while the siemens is the unit for conductance."
+       },
+       {
+        "question": "Which of the following materials is considered a non-ohmic conductor?",
+        "options": [
+         "A standard carbon resistor",
+         "A copper wire",
+         "A thermistor",
+         "A silicon diode"
+        ],
+        "answer_index": 3,
+        "explanation": "Non-ohmic materials like diodes and thermistors have resistance values that vary depending on voltage or temperature, violating the constant R requirement of Ohm's law."
+       },
+       {
+        "question": "How does Ohm's law relate to the calculation of power dissipated by a resistor?",
+        "options": [
+         "Power is independent of resistance.",
+         "Power is calculated using voltage, current, and resistance via derived formulas.",
+         "Power is only determined by voltage.",
+         "Power is only determined by current."
+        ],
+        "answer_index": 1,
+        "explanation": "Power dissipation is calculated by combining Ohm's law (V=IR) with Joule's law, resulting in formulas like P=IV or P=I²R."
+       },
+       {
+        "question": "What is the primary limitation of Ohm's law regarding the resistance value?",
+        "options": [
+         "It only applies to AC circuits.",
+         "It assumes resistance is constant regardless of current or voltage.",
+         "It requires resistance to be measured in siemens.",
+         "It cannot be used for calculating power."
+        ],
+        "answer_index": 1,
+        "explanation": "Ohm's law strictly applies to linear resistors where the resistance R is constant and independent of the applied voltage or current."
+       }
+      ]
+     },
+     "predicted": [
+      613
+     ],
+     "whitespace": {
+      "last_call_tokens": 613,
+      "compact_tokens": 433,
+      "raw_chars": 2415,
+      "compact_chars": 1982,
+      "newlines": 58
+     }
+    },
+    "video": {
+     "wall_s": 83.8,
+     "calls": 1,
+     "generated": 551,
+     "prompt_n": 347,
+     "cached": 1144,
+     "gen_tps": [
+      6.95
+     ],
+     "prompt_tps": [
+      75.8
+     ],
+     "draft_n": 0,
+     "draft_accepted": 0,
+     "finish": [
+      "stop"
+     ],
+     "error": null,
+     "output": {
+      "title": "What is Ohm's Law?",
+      "beats": [
+       {
+        "template": "definition",
+        "title": "Ohm's Law",
+        "narration": "Ohm's Law states that current is directly proportional to voltage.",
+        "lines": [
+         "Current equals Voltage divided by Resistance.",
+         "This relationship holds for most conductive materials.",
+         "The constant of proportionality is called resistance."
+        ]
+       },
+       {
+        "template": "bullets",
+        "title": "Key Concepts",
+        "narration": "Let's review the three core variables involved here.",
+        "lines": [
+         "Voltage pushes electrons through the circuit.",
+         "Resistance opposes the flow of electrons.",
+         "Current is the actual flow of electrons."
+        ]
+       },
+       {
+        "template": "code_walkthrough",
+        "title": "Calculating Current",
+        "narration": "Here is how you calculate current using Python.",
+        "code": "V = 10\nR = 5\nI = V / R\nprint(f\"Current is {I} amps\")",
+        "highlight": [
+         2,
+         3
+        ]
+       },
+       {
+        "template": "bar_chart",
+        "title": "Voltage vs Current",
+        "narration": "See how current changes as voltage increases.",
+        "lines": [
+         "Current at 5V is 1.0 A",
+         "Current at 10V is 2.0 A",
+         "Current at 15V is 3.0 A",
+         "Current at 20V is 4.0 A",
+         "Current at 25V is 5.0 A"
+        ],
+        "labels": [
+         "5 V",
+         "10 V",
+         "15 V",
+         "20 V",
+         "25 V"
+        ]
+       },
+       {
+        "template": "definition",
+        "title": "Recap",
+        "narration": "Remember, current equals voltage over resistance.",
+        "lines": [
+         "Formula: I equals V over R.",
+         "Units are Amperes, Volts, and Ohms.",
+         "This applies to linear resistors only."
+        ]
+       }
+      ]
+     },
+     "predicted": [
+      551
+     ],
+     "whitespace": {
+      "last_call_tokens": 551,
+      "compact_tokens": 346,
+      "raw_chars": 1797,
+      "compact_chars": 1328,
+      "newlines": 63
+     }
+    }
+   },
+   "passages": [
+    "Ohm",
+    "Ohm",
+    "Ohm's law",
+    "Ohm's law",
+    "Ohm's law"
+   ],
+   "peak_rss_mb": 3325,
+   "total_s": 490.36,
+   "time": "2026-10-07 04:05:14"
+  },
+  {
+   "variant": "compact",
+   "args": [],
+   "generator_options": {
+    "compact_json": true
+   },
+   "load_s": 2.12,
+   "tasks": {
+    "notes": {
+     "wall_s": 127.25,
+     "calls": 1,
+     "generated": 777,
+     "prompt_n": 1328,
+     "cached": 0,
+     "gen_tps": [
+      7.0
+     ],
+     "prompt_tps": [
+      81.23
+     ],
+     "draft_n": 0,
+     "draft_accepted": 0,
+     "finish": [
+      "stop"
+     ],
+     "error": null,
+     "output": {
+      "title": "Ohm's Law: The Foundation of Electronics",
+      "sections": [
+       {
+        "heading": "The Core Relationship",
+        "body": "Ohm's Law describes the linear relationship between voltage, current, and resistance in a conductor. It states that current is directly proportional to voltage and inversely proportional to resistance. The fundamental formula is **I = V / R**, where **I** is current, **V** is voltage, and **R** is resistance. This applies to 'linear resistors' where resistance remains constant regardless of applied voltage."
+       },
+       {
+        "heading": "Units and Power",
+        "body": "The standard SI units are Amperes (A) for current, Volts (V) for voltage, and Ohms (Ω) for resistance. Power dissipated by a resistor can be calculated using **P = V·I** or **P = I²·R**. Note that in AC circuits, the resistance value may vary with time, requiring integration for average power calculations."
+       },
+       {
+        "heading": "Ohmic vs. Non-Ohmic Materials",
+        "body": "Not all materials obey Ohm's Law. 'Ohmic' materials (like standard resistors) have a constant resistance, meaning the V-I graph is a straight line. 'Non-ohmic' materials (like thermistors or diodes) have resistance that varies with temperature or voltage, resulting in a curved V-I graph. Ohm's Law is an empirical relation accurate for most conductive materials over many orders of magnitude."
+       },
+       {
+        "heading": "Real-World Limitations",
+        "body": "While useful for macroscopic circuit analysis, Ohm's Law has limits. At the microscopic level, physicists use a vector form of the law accounting for position-dependent variables. Additionally, practical resistors exhibit 'Johnson-Nyquist noise' (statistical current fluctuations) due to the discrete nature of charge, meaning instantaneous V/I ratios fluctuate even if resistance is constant."
+       }
+      ],
+      "key_points": [
+       "Ohm's Law states **I = V / R** for linear resistors.",
+       "Current is directly proportional to voltage and inversely proportional to resistance.",
+       "Power dissipation is calculated as **P = V·I** or **P = I²·R**.",
+       "Materials that vary resistance with voltage are called 'non-ohmic'.",
+       "The unit of conductance is the Siemens (S), the reciprocal of the Ohm.",
+       "Ohm's Law applies to the average values in AC circuits, not necessarily instantaneous ones."
+      ],
+      "glossary": [
+       {
+        "term": "Ohm's Law",
+        "definition": "The empirical relation stating current is proportional to voltage and inversely proportional to resistance."
+       },
+       {
+        "term": "Linear Resistor",
+        "definition": "A resistor with a constant resistance value over a useful range of currents or voltages."
+       },
+       {
+        "term": "Non-ohmic",
+        "definition": "A material or component whose resistance varies depending on the applied voltage or current."
+       },
+       {
+        "term": "Siemens",
+        "definition": "The SI derived unit of electric conductance, symbolized as S (1 S = 1 Ω⁻¹)."
+       }
+      ],
+      "concept_map": [
+       {
+        "from": "Voltage",
+        "label": "drives",
+        "to": "Current"
+       },
+       {
+        "from": "Resistance",
+        "label": "opposes",
+        "to": "Current"
+       },
+       {
+        "from": "Current",
+        "label": "flows through",
+        "to": "Conductor"
+       },
+       {
+        "from": "Voltage",
+        "label": "is measured in",
+        "to": "Volts"
+       },
+       {
+        "from": "Resistance",
+        "label": "is measured in",
+        "to": "Ohms"
+       },
+       {
+        "from": "Current",
+        "label": "is measured in",
+        "to": "Amperes"
+       },
+       {
+        "from": "Ohm's Law",
+        "label": "applies to",
+        "to": "Linear Resistors"
+       },
+       {
+        "from": "Ohm's Law",
+        "label": "does not apply to",
+        "to": "Non-ohmic Materials"
+       },
+       {
+        "from": "Power",
+        "label": "depends on",
+        "to": "Voltage and Current"
+       },
+       {
+        "from": "Temperature",
+        "label": "affects",
+        "to": "Resistance (in thermistors)"
+       }
+      ]
+     },
+     "predicted": [
+      777
+     ],
+     "whitespace": {
+      "last_call_tokens": 777,
+      "compact_tokens": 770,
+      "raw_chars": 3383,
+      "compact_chars": 3383,
+      "newlines": 0
+     }
+    },
+    "quiz": {
+     "wall_s": 56.03,
+     "calls": 1,
+     "generated": 384,
+     "prompt_n": 82,
+     "cached": 1144,
+     "gen_tps": [
+      7.02
+     ],
+     "prompt_tps": [
+      56.67
+     ],
+     "draft_n": 0,
+     "draft_accepted": 0,
+     "finish": [
+      "stop"
+     ],
+     "error": null,
+     "output": {
+      "questions": [
+       {
+        "question": "What is the mathematical relationship between voltage (V), current (I), and resistance (R) according to Ohm's law?",
+        "options": [
+         "V = I × R",
+         "I = V / R",
+         "R = V × I",
+         "V = R / I"
+        ],
+        "answer_index": 0,
+        "explanation": "Ohm's law states that voltage equals current multiplied by resistance (V = I × R)."
+       },
+       {
+        "question": "If the voltage across a resistor is doubled while the resistance stays the same, what happens to the current?",
+        "options": [
+         "It doubles",
+         "It halves",
+         "It stays the same",
+         "It quadruples"
+        ],
+        "answer_index": 0,
+        "explanation": "Since current is directly proportional to voltage (I = V/R), doubling the voltage doubles the current."
+       },
+       {
+        "question": "Which unit is the SI derived unit for electrical conductance, the inverse of resistance?",
+        "options": [
+         "The Ohm (Ω)",
+         "The Siemens (S)",
+         "The Volt (V)",
+         "The Ampere (A)"
+        ],
+        "answer_index": 1,
+        "explanation": "The Siemens (S) is the reciprocal of the Ohm and represents electrical conductance."
+       },
+       {
+        "question": "A component is called 'non-ohmic' if its resistance...",
+        "options": [
+         "Is constant regardless of voltage",
+         "Varies depending on the applied voltage or current",
+         "Is always zero",
+         "Is measured in Siemens"
+        ],
+        "answer_index": 1,
+        "explanation": "Non-ohmic components have a resistance value that changes with the applied voltage or current, unlike linear resistors."
+       },
+       {
+        "question": "What is the primary reason for the statistical fluctuations in current through a resistor even when voltage and resistance are constant?",
+        "options": [
+         "Temperature changes",
+         "The discrete nature of electric charge",
+         "Magnetic interference",
+         "AC frequency effects"
+        ],
+        "answer_index": 1,
+        "explanation": "These fluctuations, known as Johnson–Nyquist noise, arise because electric charge is made of discrete particles."
+       }
+      ]
+     },
+     "predicted": [
+      384
+     ],
+     "whitespace": {
+      "last_call_tokens": 384,
+      "compact_tokens": 380,
+      "raw_chars": 1738,
+      "compact_chars": 1738,
+      "newlines": 0
+     }
+    },
+    "video": {
+     "wall_s": 52.74,
+     "calls": 1,
+     "generated": 335,
+     "prompt_n": 347,
+     "cached": 1144,
+     "gen_tps": [
+      6.93
+     ],
+     "prompt_tps": [
+      76.93
+     ],
+     "draft_n": 0,
+     "draft_accepted": 0,
+     "finish": [
+      "stop"
+     ],
+     "error": null,
+     "output": {
+      "title": ": Ohm's Law Explained",
+      "beats": [
+       {
+        "template": "bullets",
+        "title": "What is Ohm's Law?",
+        "narration": "Ohm's Law describes the relationship between voltage, current, and resistance.",
+        "lines": [
+         "Current increases with voltage.",
+         "Resistance opposes current flow.",
+         "The formula is V = I × R."
+        ]
+       },
+       {
+        "template": "process_steps",
+        "title": "How to Calculate Current",
+        "narration": "To find current, divide voltage by resistance.",
+        "lines": [
+         "1. Measure voltage across the component.",
+         "2. Measure resistance of the component.",
+         "3. Divide voltage by resistance to get current.",
+         "4. Check units are in Volts, Ohms, and Amperes."
+        ]
+       },
+       {
+        "template": "definition",
+        "title": "Ohm's Law",
+        "narration": "Voltage equals current times resistance.",
+        "lines": [
+         "V = I × R",
+         "Example: 12V across 4Ω gives 3A."
+        ]
+       },
+       {
+        "template": "bullets",
+        "title": "Key Takeaways",
+        "narration": "Remember the formula and how units interact.",
+        "lines": [
+         "Higher voltage means more current.",
+         "Higher resistance means less current.",
+         "Power is calculated from V and I."
+        ]
+       },
+       {
+        "template": "code_walkthrough",
+        "title": "Python Calculator",
+        "narration": "This code calculates current from voltage and resistance.",
+        "lines": [
+         "V = 12",
+         "R = 4",
+         "I = V / R",
+         "print(I)"
+        ],
+        "highlight": [
+         4
+        ]
+       },
+       {
+        "template": "definition",
+        "title": "Recap",
+        "narration": "Ohm's Law links voltage, current, and resistance.",
+        "lines": [
+         "V = I × R",
+         "I = V / R",
+         "R = V / I"
+        ]
+       }
+      ]
+     },
+     "predicted": [
+      335
+     ],
+     "whitespace": {
+      "last_call_tokens": 335,
+      "compact_tokens": 330,
+      "raw_chars": 1352,
+      "compact_chars": 1352,
+      "newlines": 0
+     }
+    }
+   },
+   "passages": [
+    "Ohm",
+    "Ohm",
+    "Ohm's law",
+    "Ohm's law",
+    "Ohm's law"
+   ],
+   "peak_rss_mb": 3313,
+   "total_s": 238.47,
+   "time": "2026-10-07 04:09:25"
+  },
+  {
+   "variant": "compact",
+   "args": [],
+   "generator_options": {
+    "compact_json": true,
+    "json_spaces": true
+   },
+   "load_s": 2.11,
+   "tasks": {
+    "notes": {
+     "wall_s": 128.15,
+     "calls": 1,
+     "generated": 782,
+     "prompt_n": 1328,
+     "cached": 0,
+     "gen_tps": [
+      6.97
+     ],
+     "prompt_tps": [
+      82.57
+     ],
+     "draft_n": 0,
+     "draft_accepted": 0,
+     "finish": [
+      "stop"
+     ],
+     "error": null,
+     "output": {
+      "title": "Ohm's Law: The Foundation of Electronics",
+      "sections": [
+       {
+        "heading": "The Core Relationship",
+        "body": "Ohm's Law describes the fundamental link between voltage, current, and resistance in a circuit. It states that current is directly proportional to voltage and inversely proportional to resistance. The formula is: **I = V / R**."
+       },
+       {
+        "heading": "Units and Power",
+        "body": "Voltage is measured in **Volts (V)**, current in **Amperes (A)**, and resistance in **Ohms (Ω)**. The power dissipated by a resistor can be calculated using resistance and either voltage or current: **P = V² / R** or **P = I² · R**."
+       },
+       {
+        "heading": "Linear vs. Non-Linear",
+        "body": "Most standard resistors are 'linear,' meaning their resistance stays constant regardless of voltage or current. However, some components like thermistors are 'non-linear' because their resistance changes with temperature or voltage, making simple Ohm's Law calculations less direct."
+       },
+       {
+        "heading": "Real-World Limits",
+        "body": "Ohm's Law applies to the average behavior of conductors. In reality, microscopic fluctuations (Johnson–Nyquist noise) cause tiny variations in current even when voltage and resistance are constant, but the law remains accurate for standard engineering calculations."
+       }
+      ],
+      "key_points": [
+       "Ohm's Law states Current = Voltage / Resistance.",
+       "The standard units are Volts (V), Amperes (A), and Ohms (Ω).",
+       "Power dissipated by a resistor can be found using P = V²/R or P = I²·R.",
+       "Linear resistors have constant resistance, while non-linear ones (like thermistors) do not.",
+       "Ohm's Law holds true for average values despite microscopic electrical noise."
+      ],
+      "glossary": [
+       {
+        "term": "Ohm's Law",
+        "definition": "The principle stating that current through a conductor is proportional to voltage and inversely proportional to resistance."
+       },
+       {
+        "term": "Resistance",
+        "definition": "The opposition to current flow, measured in Ohms (Ω)."
+       },
+       {
+        "term": "Voltage",
+        "definition": "The electrical potential difference driving current, measured in Volts (V)."
+       },
+       {
+        "term": "Current",
+        "definition": "The rate of flow of electric charge, measured in Amperes (A)."
+       },
+       {
+        "term": "Linear Resistor",
+        "definition": "A resistor whose resistance value remains constant over a range of voltages and currents."
+       },
+       {
+        "term": "Non-Ohmic",
+        "definition": "A property of materials where resistance varies with voltage or current, violating strict Ohm's Law."
+       }
+      ],
+      "concept_map": [
+       {
+        "from": "Voltage",
+        "label": "drives",
+        "to": "Current"
+       },
+       {
+        "from": "Current",
+        "label": "flows through",
+        "to": "Resistor"
+       },
+       {
+        "from": "Resistor",
+        "label": "opposes",
+        "to": "Current"
+       },
+       {
+        "from": "Voltage",
+        "label": "is measured in",
+        "to": "Volts"
+       },
+       {
+        "from": "Current",
+        "label": "is measured in",
+        "to": "Amperes"
+       },
+       {
+        "from": "Resistor",
+        "label": "is measured in",
+        "to": "Ohms"
+       },
+       {
+        "from": "Ohm's Law",
+        "label": "relates",
+        "to": "Voltage, Current, Resistance"
+       },
+       {
+        "from": "Linear Resistor",
+        "label": "has constant",
+        "to": "Resistance"
+       },
+       {
+        "from": "Non-Ohmic",
+        "label": "has variable",
+        "to": "Resistance"
+       },
+       {
+        "from": "Power",
+        "label": "dissipated by",
+        "to": "Resistor"
+       }
+      ]
+     },
+     "predicted": [
+      782
+     ],
+     "whitespace": {
+      "last_call_tokens": 782,
+      "compact_tokens": 671,
+      "raw_chars": 3085,
+      "compact_chars": 2975,
+      "newlines": 0
+     }
+    },
+    "quiz": {
+     "wall_s": 81.26,
+     "calls": 1,
+     "generated": 565,
+     "prompt_n": 82,
+     "cached": 1144,
+     "gen_tps": [
+      7.07
+     ],
+     "prompt_tps": [
+      58.56
+     ],
+     "draft_n": 0,
+     "draft_accepted": 0,
+     "finish": [
+      "stop"
+     ],
+     "error": null,
+     "output": {
+      "questions": [
+       {
+        "question": "According to Ohm's law, if the voltage across a resistor is doubled while the resistance remains constant, what happens to the current?",
+        "options": [
+         "It doubles.",
+         "It quadruples.",
+         "It is halved.",
+         "It remains unchanged."
+        ],
+        "answer_index": 0,
+        "explanation": "Ohm's law states that current is directly proportional to voltage, so doubling the voltage doubles the current."
+       },
+       {
+        "question": "Which unit is the reciprocal of the ohm (Ω)?",
+        "options": [
+         "The volt (V).",
+         "The ampere (A).",
+         "The siemens (S).",
+         "The watt (W)."
+        ],
+        "answer_index": 2,
+        "explanation": "The siemens (S) is the SI derived unit for conductance, defined as one reciprocal ohm (1 S = 1/Ω)."
+       },
+       {
+        "question": "What is the primary difference between a linear resistor and a non-linear resistor regarding Ohm's law?",
+        "options": [
+         "Linear resistors only work with AC, while non-linear ones work with DC.",
+         "Linear resistors have constant resistance, while non-linear resistors have resistance that varies with voltage or time.",
+         "Linear resistors dissipate less heat than non-linear resistors.",
+         "Non-linear resistors can only be used in series circuits."
+        ],
+        "answer_index": 1,
+        "explanation": "Ohm's law strictly applies to linear resistors where resistance is constant; non-linear resistors have resistance values that change based on applied voltage or current."
+       },
+       {
+        "question": "In the context of Ohm's law, what does the variable 'R' represent?",
+        "options": [
+         "The rate of electron flow.",
+         "The electrical potential difference.",
+         "The opposition to current flow (resistance).",
+         "The total energy consumed in the circuit."
+        ],
+        "answer_index": 2,
+        "explanation": "In the equation V = I × R, 'R' stands for resistance, which is the constant of proportionality representing how much a material opposes current."
+       },
+       {
+        "question": "Why is Ohm's law considered an empirical relation rather than a fundamental law of physics?",
+        "options": [
+         "It was discovered by Thomas Edison.",
+         "It accurately describes the conductivity of most materials but fails for non-ohmic components like thermistors.",
+         "It cannot be used in alternating current (AC) circuits.",
+         "It is derived directly from Maxwell's equations without experimental verification."
+        ],
+        "answer_index": 1,
+        "explanation": "Ohm's law is an empirical observation that holds true for many conductive materials under specific conditions, but it is not a universal law as it does not apply to all materials (non-ohmic)."
+       }
+      ]
+     },
+     "predicted": [
+      565
+     ],
+     "whitespace": {
+      "last_call_tokens": 565,
+      "compact_tokens": 512,
+      "raw_chars": 2448,
+      "compact_chars": 2393,
+      "newlines": 0
+     }
+    },
+    "video": {
+     "wall_s": 73.2,
+     "calls": 1,
+     "generated": 483,
+     "prompt_n": 347,
+     "cached": 1144,
+     "gen_tps": [
+      7.0
+     ],
+     "prompt_tps": [
+      81.21
+     ],
+     "draft_n": 0,
+     "draft_accepted": 0,
+     "finish": [
+      "stop"
+     ],
+     "error": null,
+     "output": {
+      "title": "What is Ohm's Law?",
+      "beats": [
+       {
+        "template": "bullets",
+        "title": "The Basics",
+        "narration": "Ohm's Law connects voltage, current, and resistance.",
+        "lines": [
+         "Current equals voltage divided by resistance.",
+         "Voltage pushes electrons through a circuit.",
+         "Resistance opposes the flow of electrons."
+        ],
+        "code": "",
+        "highlight": []
+       },
+       {
+        "template": "definition",
+        "title": "Ohm's Law",
+        "narration": "This law states current is proportional to voltage.",
+        "lines": [
+         "I = V / R",
+         "I is current, V is voltage, R is resistance."
+        ],
+        "code": "",
+        "highlight": []
+       },
+       {
+        "template": "process_steps",
+        "title": "How to Calculate",
+        "narration": "Follow these three steps to solve any problem.",
+        "lines": [
+         "Identify the known values in the circuit.",
+         "Rearrange the formula to solve for the unknown.",
+         "Plug in the numbers and calculate the result."
+        ],
+        "code": "",
+        "highlight": []
+       },
+       {
+        "template": "bar_chart",
+        "title": "Voltage vs Current",
+        "narration": "Higher voltage creates more current flow.",
+        "lines": [
+         "0 V",
+         "10 V",
+         "20 V",
+         "30 V",
+         "40 V",
+         "50 V"
+        ],
+        "values": [
+         0,
+         0.1,
+         0.2,
+         0.3,
+         0.4,
+         0.5
+        ],
+        "code": "",
+        "highlight": []
+       },
+       {
+        "template": "code_walkthrough",
+        "title": "Python Calculation",
+        "narration": "Here is how to calculate current in code.",
+        "lines": [
+         "V = 12",
+         "R = 4",
+         "I = V / R",
+         "print(I)",
+         "Output: 3.0"
+        ],
+        "highlight": [
+         1,
+         2,
+         3,
+         4
+        ]
+       },
+       {
+        "template": "bullets",
+        "title": "Quick Recap",
+        "narration": "Remember: Voltage pushes, resistance stops, current flows.",
+        "lines": [
+         "Use I = V / R for all calculations.",
+         "Check units: Volts, Ohms, Amperes.",
+         "Apply the law to any simple circuit."
+        ],
+        "code": "",
+        "highlight": []
+       }
+      ]
+     },
+     "predicted": [
+      483
+     ],
+     "whitespace": {
+      "last_call_tokens": 483,
+      "compact_tokens": 389,
+      "raw_chars": 1611,
+      "compact_chars": 1513,
+      "newlines": 0
+     }
+    }
+   },
+   "passages": [
+    "Ohm",
+    "Ohm",
+    "Ohm's law",
+    "Ohm's law",
+    "Ohm's law"
+   ],
+   "peak_rss_mb": 3396,
+   "total_s": 285.04,
+   "time": "2026-10-07 04:47:37"
+  }
+ ],
+ "lesson": "/tmp/claude-0/-home-user-GateMoE/fb8f141f-48cd-5abb-adc1-ed41947d5a7d/scratchpad/e2e/data/jobs/e2e_en/lesson.json",
+ "tasks": "notes,quiz,video",
+ "threads": 4,
+ "generator": "Qwen3.5-4B-Q4_K_M.gguf"
+}

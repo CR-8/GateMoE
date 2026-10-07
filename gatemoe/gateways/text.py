@@ -23,7 +23,7 @@ SOURCES:
 TASKS = {
     "plan": """Learner request: {request}
 Plan a short lesson. Give a clear title, 1-3 short English search queries for an offline encyclopedia, \
-0-2 short search queries in {lang_name} (empty if {lang_name} is English) and 2-6 key terms.""",
+{native_rule} and 2-6 key terms.""",
     "notes": """Learner request: {request}
 Write concise study notes: 3-4 sections with a heading and a short body (plain text with simple Markdown such as **bold** and - lists; formulas inline like F = m·a), \
 then 3-6 key points and a glossary of 2-8 terms.{concept_map}""",
@@ -109,7 +109,12 @@ class TextGateway:
         return int(int(self.cfg[f"generation.max_tokens.{task}"]) * float(self.info.get("token_factor", 1.0)))
 
     def plan(self) -> dict:
-        return self.gen.chat_json(self._messages(self._fmt("plan")), schemas.plan_schema(self.lang == "en"),
+        # must agree with plan_schema(): an empty native list for English, 1-2 queries otherwise
+        # (a prompt that allows 0 against a schema that requires 1 makes the model write garbage)
+        native_rule = ("no queries in other languages (search_queries_native is an empty list)" if self.lang == "en"
+                       else f"1-2 short search queries written in {self.info['name']} (2-4 words each)")
+        return self.gen.chat_json(self._messages(self._fmt("plan", native_rule=native_rule)),
+                                  schemas.plan_schema(self.lang == "en"),
                                   name="plan", max_tokens=self._budget("plan"))
 
     def generate(self, task: str, video_engine: str | None = None) -> dict:

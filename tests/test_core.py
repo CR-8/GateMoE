@@ -1,4 +1,5 @@
 import json
+import re
 
 import pytest
 
@@ -146,3 +147,37 @@ def test_second_server_on_busy_port_is_refused(cfg):
         assert first.current.running()                   # the real server is untouched
     finally:
         first.unload()
+
+
+def test_compact_grammar_matches_schema_constraints():
+    from gatemoe.llm.gbnf import Unsupported, schema_to_gbnf
+    g = schema_to_gbnf(schemas.quiz_schema(5))
+    rules = dict(line.split(" ::= ", 1) for line in g.strip().splitlines())
+    assert rules["root"] == "root-obj" and all(re.fullmatch(r"[A-Za-z0-9-]+", k) for k in rules)
+    assert '"\\"answer_index\\"" ":" int0-3' in rules["root-obj-questions-item"]
+    assert rules["int0-3"] == '"0" | "1" | "2" | "3"'
+    assert '("," str1-120){3,3}' in g and '("," root-obj-questions-item){4,4}' in g   # 4 options, 5 questions
+    assert "space" not in g
+    v = schema_to_gbnf(schemas.video_schema("manim", 6))
+    assert '("," "\\"target\\"" ":" number)?' in v                     # optional properties stay optional
+    with pytest.raises(Unsupported):
+        schema_to_gbnf({"type": "object", "properties": {"a": {"type": "string"}}, "required": []})
+    gen = Generator("http://127.0.0.1:1", compact_json=True)
+    assert gen.compact_json
+
+
+def test_compact_json_request(monkeypatch):
+    import gatemoe.llm.client as client
+    sent = {}
+
+    def fake_post(url, body, timeout=0, cancel_check=None):
+        sent.update(body)
+        return {"choices": [{"message": {"content": '{"cards":[{"front":"Q","back":"A"}]}'},
+                             "finish_reason": "stop"}], "timings": {"predicted_n": 12}}
+
+    monkeypatch.setattr(client, "post_json", fake_post)
+    out = Generator("http://x", compact_json=True).chat_json([{"role": "user", "content": "x"}],
+                                                             schemas.flashcards_schema(1), name="f", max_tokens=50)
+    assert out == {"cards": [{"front": "Q", "back": "A"}]}
+    assert "grammar" in sent and "response_format" not in sent and sent["grammar"].startswith("root ::=")
+    assert '"," " "? ' in sent["grammar"] and "\\n" not in sent["grammar"]   # spaces allowed, newlines not
