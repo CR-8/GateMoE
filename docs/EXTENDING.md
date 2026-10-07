@@ -24,6 +24,8 @@ speech:
       timeout_s: 900
 ```
 
+`prefer` is opt-in (default `false`: a plugin is only a fallback for languages without a built-in voice). If a preferred plugin fails during a lesson (server switched off, timeout), it is skipped for the rest of that lesson and the built-in voices take over.
+
 `{text}`, `{voice}` and `{lang}` are replaced in every string of `body`. Any response audio
 format FFmpeg can decode works (WAV, MP3, Opus …). OpenAI-style servers work the same way, e.g.
 `body: {model: tts-1, input: "{text}", voice: "{voice}", response_format: wav}`.

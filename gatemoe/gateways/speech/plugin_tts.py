@@ -36,6 +36,8 @@ from pathlib import Path
 
 import numpy as np
 
+from ..video.sandbox import run_limited
+
 
 def _fill(obj, values: dict):
     if isinstance(obj, str):
@@ -86,7 +88,10 @@ class PluginTTS:
                 text_file.write_text(text, encoding="utf-8")
                 out_wav = Path(tmp) / "out.wav"
                 argv = _fill(list(self.spec["argv"]), {**values, "text_file": text_file, "out_wav": out_wav})
-                subprocess.run(argv, check=True, capture_output=True, timeout=self.timeout)
+                # own process group: a timeout kills wrapper scripts and the TTS they started
+                proc = run_limited([str(a) for a in argv], timeout=self.timeout)
+                if proc.returncode != 0:
+                    raise RuntimeError(f"TTS command failed ({proc.returncode}): {proc.stderr[-300:]}")
                 raw = out_wav
             return _to_pcm16_mono(raw, self.ffmpeg)
 
@@ -94,6 +99,6 @@ class PluginTTS:
 def plugin_for(lang: str, plugins: list[dict]) -> dict | None:
     for p in plugins or []:
         langs = p.get("languages") or ["*"]
-        if p.get("prefer", True) and ("*" in langs or lang in langs):
+        if p.get("prefer", False) and ("*" in langs or lang in langs):   # opt-in: prefer: true
             return p
     return None

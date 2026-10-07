@@ -203,6 +203,7 @@ class Engines:
         self.root = Path(cfg.models)
         from collections import OrderedDict
         self._cache: "OrderedDict[tuple, object]" = OrderedDict()
+        self._down: set[str] = set()     # plugins that failed this lesson (server down, timeout)
 
     def unload(self) -> None:
         self._cache.clear()
@@ -222,7 +223,7 @@ class Engines:
 
     def route(self, lang: str) -> tuple:
         from .plugin_tts import plugin_for
-        pref = plugin_for(lang, self.cfg.plugins)
+        pref = plugin_for(lang, [p for p in self.cfg.plugins if p.get("name") not in self._down])
         if pref:   # a configured engine (e.g. Fish Speech server) preferred for this language
             v = pref.get("voices") or {}
             return ("plugin", pref["name"], v.get("A"), v.get("B"))
@@ -232,6 +233,8 @@ class Engines:
             if self._exists(cand[0], cand[1]):
                 return cand
         for p in self.cfg.plugins:   # non-preferred plugins act as fallbacks
+            if p.get("name") in self._down:
+                continue
             langs = p.get("languages") or ["*"]
             if "*" in langs or lang in langs:
                 v = p.get("voices") or {}
@@ -269,7 +272,20 @@ class Engines:
         return self._cache[key]
 
     def synth(self, text: str, lang: str, speaker: str) -> tuple[np.ndarray, int, dict]:
-        engine, model, va, vb, *rest = self.route(lang)
+        """Synthesise with the routed engine; a failing plugin (e.g. a GPU box that is switched
+        off) is marked down and the built-in voices take over for the rest of the lesson."""
+        while True:
+            route = self.route(lang)
+            try:
+                return self._synth(route, text, lang, speaker)
+            except Exception as exc:
+                if route[0] != "plugin":
+                    raise
+                log.warning("TTS plugin %s failed (%s); falling back", route[1], exc)
+                self._down.add(route[1])
+
+    def _synth(self, route: tuple, text: str, lang: str, speaker: str) -> tuple[np.ndarray, int, dict]:
+        engine, model, va, vb, *rest = route
         t0 = time.perf_counter()
         eng = self.get(engine, model)
         voice = va if speaker == "A" else vb

@@ -79,11 +79,20 @@ class SpeechGateway:
         out_dir.mkdir(parents=True, exist_ok=True)
         results = []
         t0 = time.perf_counter()
+        failures = []
         for i, text in enumerate(texts):
             if events:
                 events.check_cancel()
-            text = (text or "").strip() or "."
-            wav, sr, info = self.engines.synth(text, lang, "A")
+            text = (text or "").strip()
+            if not text:              # nothing to say: the beat stays silent (caption timing applies)
+                results.append({"wav": None, "duration_s": 0.0, "engine": None})
+                continue
+            try:
+                wav, sr, info = self.engines.synth(text, lang, "A")
+            except Exception as exc:  # one bad beat must not silence the whole video
+                failures.append(f"beat {i}: {type(exc).__name__}: {exc}"[:300])
+                results.append({"wav": None, "duration_s": 0.0, "engine": None, "error": failures[-1]})
+                continue
             raw = out_dir / f"beat{i:02d}_raw.wav"
             write_wav(raw, wav, sr)
             path = out_dir / f"beat{i:02d}.wav"
@@ -94,9 +103,11 @@ class SpeechGateway:
             y = level(trim_silence(y, OUT_SR), OUT_SR, target_db=-18.0)
             write_wav(path, y, OUT_SR)
             results.append({"wav": str(path), "duration_s": round(len(y) / OUT_SR, 3), "engine": info["engine"]})
+        if texts and all(r["wav"] is None for r in results) and failures:
+            raise RuntimeError("narration failed for every beat: " + "; ".join(failures[:3]))
         if events:
             total = sum(r["duration_s"] for r in results)
-            events.emit("tts_narration", beats=len(results), audio_s=round(total, 2),
+            events.emit("tts_narration", beats=len(results), audio_s=round(total, 2), failed=len(failures),
                         seconds=round(time.perf_counter() - t0, 2))
         return results
 

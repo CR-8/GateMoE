@@ -84,9 +84,11 @@ def build_payload(template: str, data: dict) -> dict:
                 continue
             if v != v or v in (float("inf"), float("-inf")):
                 continue
-            bars.append({"label": clean_text(b.get("label"), 40), "value": max(0.0, v)})
+            bars.append({"label": clean_text(b.get("label"), 40), "value": v})
         if not bars:
             raise ValueError("bars: need 1-8 bars with numeric values")
+        if any(b["value"] < 0 for b in bars):   # the template draws upward bars only: never clamp data
+            raise ValueError("bars: negative values cannot be drawn by this template")
         out.update(heading=clean_text(data.get("heading"), 120), caption=clean_text(data.get("caption"), 160),
                    unit=clean_text(data.get("unit"), 8), bars=bars)
     elif template == "code":
@@ -109,10 +111,15 @@ def anim_seconds(template: str) -> float:
     return {"title": 2.4, "bullets": 3.0, "steps": 3.0, "bars": 3.0, "code": 3.0}[template]
 
 
-def extend_hold(ffmpeg: str, src: Path, dst: Path, total: float, fps: int, crf: str = "20") -> None:
-    """Clone the last frame until ``total`` seconds."""
+def extend_hold(ffmpeg: str, src: Path, dst: Path, total: float, fps: int, crf: str = "20",
+                size: tuple[int, int] = (1280, 720)) -> None:
+    """Clone the last frame until ``total`` seconds (and match the lesson's frame size, so the
+    concat demuxer can join HyperFrames and Manim beats without re-encoding)."""
+    w, h = size
+    scale = "" if (w, h) == (1280, 720) else (f",scale={w}:{h}:force_original_aspect_ratio=decrease,"
+                                             f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2,setsar=1")
     cmd = [ffmpeg, "-v", "error", "-y", "-i", str(src), "-vf",
-           f"tpad=stop_mode=clone:stop_duration={total:.3f},trim=duration={total:.3f},fps={fps}",
+           f"tpad=stop_mode=clone:stop_duration={total:.3f},trim=duration={total:.3f},fps={fps}{scale}",
            "-c:v", "libx264", "-preset", "veryfast", "-crf", crf, "-pix_fmt", "yuv420p",
            "-movflags", "+faststart", "-an", str(dst)]
     subprocess.run(cmd, check=True, capture_output=True, timeout=600)
@@ -190,7 +197,10 @@ class HyperFramesEngine:
         payload = build_payload(template, data)
         self.ensure_assets()
         fps = self.fps
-        duration = math.ceil(max(1.0, min(float(duration), 600.0)) * fps - 1e-6) / fps
+        # a beat lasts at least as long as its entrance animation (short narration is padded with
+        # silence at assembly), otherwise the held last frame shows half-drawn bars or bullets
+        duration = max(float(duration), anim_seconds(template) + 0.5)
+        duration = math.ceil(max(1.0, min(duration, 600.0)) * fps - 1e-6) / fps
         out_path = Path(out_path).resolve()
         render_len = min(duration, round(anim_seconds(template) + 0.5, 3))
         anim_path = out_path.with_name(out_path.stem + ".anim.mp4") if duration - render_len > 1.0 / fps else out_path
@@ -228,10 +238,15 @@ class HyperFramesEngine:
         if not used:
             raise RuntimeError("hyperframes render failed: " + " | ".join(errors))
         hold_s = 0.0
-        if anim_path != out_path:
+        size = (int(self.cfg.get("video.width", 1280)), int(self.cfg.get("video.height", 720)))
+        if anim_path != out_path or size != (1280, 720):   # templates are laid out for 1280x720
             t1 = time.time()
-            extend_hold(self.ffmpeg, anim_path, out_path, duration, fps)
-            anim_path.unlink(missing_ok=True)
+            src = anim_path
+            if anim_path == out_path:
+                src = out_path.with_name(out_path.stem + ".anim.mp4")
+                out_path.replace(src)
+            extend_hold(self.ffmpeg, src, out_path, duration, fps, size=size)
+            src.unlink(missing_ok=True)
             hold_s = time.time() - t1
         return {"out": str(out_path), "duration": duration, "renderer": used, "render_s": round(wall, 2),
                 "hold_s": round(hold_s, 2), "errors": errors}

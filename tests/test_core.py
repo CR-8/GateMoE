@@ -135,10 +135,8 @@ def test_langid_portuguese_not_forced_to_english():
 
 
 def test_second_server_on_busy_port_is_refused(cfg):
-    import pytest
 
     from gatemoe.runtime.llama_server import ServerError
-    from gatemoe.runtime.model_manager import ModelManager
     first = ModelManager(cfg)
     first.acquire("router")
     try:

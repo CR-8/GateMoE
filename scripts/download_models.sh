@@ -17,8 +17,9 @@ get() {  # url dest [sha256]
     echo "ok   $dst"; return; fi
   echo "get  $url"
   curl -fL --retry 5 --retry-delay 5 -C - -o "$dst.part" "$url"
-  mv "$dst.part" "$dst"
-  if [ -n "$sha" ]; then echo "$sha  $dst" | sha256sum -c --quiet -; fi
+  if [ -n "$sha" ] && ! echo "$sha  $dst.part" | sha256sum -c --quiet -; then
+    echo "checksum mismatch for $dst.part - deleted, run again"; rm -f "$dst.part"; return 1; fi
+  mv "$dst.part" "$dst"            # only verified files ever appear under the name the app loads
 }
 
 # ---- router: Cloudflare Clef-flash (Apache-2.0), Q4_0 for Cortex-A76 (5.60 GB)
