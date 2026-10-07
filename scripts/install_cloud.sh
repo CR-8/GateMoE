@@ -34,6 +34,12 @@ SVC_USER=gatemoe
 export DEBIAN_FRONTEND=noninteractive
 
 log()  { printf '\n\033[1;34m== %s\033[0m\n' "$*"; }
+imds() {  # EC2 instance metadata (IMDSv2); prints nothing on other clouds / errors
+  local tok
+  tok="$(curl -sf -m 2 --noproxy '*' -X PUT http://169.254.169.254/latest/api/token \
+         -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' 2>/dev/null)" || return 0
+  curl -sf -m 2 --noproxy '*' -H "X-aws-ec2-metadata-token: $tok" "http://169.254.169.254/latest/meta-data/$1" 2>/dev/null || true
+}
 warn() { printf '\033[1;33m!! %s\033[0m\n' "$*" >&2; }
 die()  { printf '\033[1;31mERROR: %s\033[0m\n' "$*" >&2; exit 1; }
 
@@ -61,7 +67,7 @@ echo "machine: $ARCH, ${NPROC} vCPU, ${MEM_GB} GB RAM, ${FREE_GB} GB free disk"
 log "System packages"
 apt-get update -q
 apt-get install -y -q --no-install-recommends build-essential cmake git curl ca-certificates bzip2 xz-utils \
-  pkg-config python3 python3-venv python3-dev libcairo2-dev libpango1.0-dev ffmpeg graphviz \
+  pkg-config python3 python3-venv python3-dev libcairo2-dev libpango1.0-dev libssl-dev ffmpeg graphviz \
   fonts-noto-core fonts-noto-cjk util-linux openssl
 # swap as a safety net on 8-12 GB machines (the router peaks close to 7 GB)
 if awk "BEGIN{exit !($MEM_GB < 12)}" && [ -z "$(swapon --show --noheadings)" ] && [ ! -f /swapfile ]; then
@@ -120,7 +126,8 @@ cd "$DATA/hyperframes"
 [ -f package.json ] || npm init -y >/dev/null
 npm install --no-fund --no-audit --loglevel=error "hyperframes@${HF_VERSION}" "gsap@${GSAP_VERSION}"
 HYPERFRAMES_NO_TELEMETRY=1 npx --no-install hyperframes telemetry disable >/dev/null 2>&1 || true
-export PLAYWRIGHT_BROWSERS_PATH="$HOME_DIR/browsers"     # Chrome-for-Testing builds, x86_64 and arm64
+cd "$HOME_DIR"
+export PLAYWRIGHT_BROWSERS_PATH="$HOME_DIR/browsers"     # Chromium builds for x86_64 and arm64
 npx -y "playwright@${PLAYWRIGHT_VERSION}" install --with-deps chromium-headless-shell >/dev/null \
   || npx -y "playwright@${PLAYWRIGHT_VERSION}" install --with-deps chromium >/dev/null
 CHROME="$(find "$PLAYWRIGHT_BROWSERS_PATH" -type f \( -name headless_shell -o -name chrome-headless-shell -o -name chrome \) \
@@ -147,16 +154,16 @@ fi
 ENV_FILE=/etc/gatemoe.env
 if [ ! -f "$ENV_FILE" ] || [ -n "${GATEMOE_PASSWORD:-}" ]; then
   PASS="${GATEMOE_PASSWORD:-$(openssl rand -base64 15 | tr -d '/+=' | cut -c1-16)}"
+  case "$PASS" in *"'"*|*$'\n'*) die "GATEMOE_PASSWORD must not contain quotes or newlines";; esac
   # names the browser may use for this server (IP addresses are always allowed)
-  TOKEN="$(curl -s -m 2 -X PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' || true)"
-  PUB_DNS="$(curl -s -m 2 -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/public-hostname || true)"
-  case "$PUB_DNS" in *.*) ;; *) PUB_DNS="";; esac
+  PUB_DNS="$(imds public-hostname)"
+  [[ "$PUB_DNS" =~ ^[A-Za-z0-9.-]+$ ]] || PUB_DNS=""
   umask 077
   cat > "$ENV_FILE" <<EOF
-GATEMOE_CONFIG=$CONF
-GATEMOE_USER=gatemoe
-GATEMOE_PASSWORD=$PASS
-GATEMOE_ALLOWED_HOSTS=$PUB_DNS
+GATEMOE_CONFIG='$CONF'
+GATEMOE_USER='gatemoe'
+GATEMOE_PASSWORD='$PASS'
+GATEMOE_ALLOWED_HOSTS='$PUB_DNS'
 EOF
   umask 022
 fi
@@ -213,10 +220,9 @@ curl -fs "http://127.0.0.1:$PORT/healthz" >/dev/null || die "the server did not 
 su -s /bin/bash "$SVC_USER" -c "set -a; . $ENV_FILE; set +a; $VENV/bin/gatemoe doctor" || true
 
 # ------------------------------------------------------------------ done
-TOKEN="$(curl -s -m 2 -X PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' || true)"
-PUB_IP="$(curl -s -m 2 -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4 || true)"
-case "$PUB_IP" in *.*.*.*) ;; *) PUB_IP="<this-server-ip>";; esac
-PASS="$(sed -n 's/^GATEMOE_PASSWORD=//p' "$ENV_FILE")"
+PUB_IP="$(imds public-ipv4)"
+[[ "$PUB_IP" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || PUB_IP="<this-server-ip>"
+PASS="$(sed -n "s/^GATEMOE_PASSWORD='\(.*\)'$/\1/p" "$ENV_FILE")"
 cat <<EOF
 
 ========================================================================
