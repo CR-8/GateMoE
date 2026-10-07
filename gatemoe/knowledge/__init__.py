@@ -28,6 +28,11 @@ SUBJECT_HINTS = {
 }
 
 
+def zim_kind(name: str) -> str:
+    """'simulations' for PhET archives (interactive apps, not text to retrieve), else 'text'."""
+    return "simulations" if name.lower().startswith("phet") else "text"
+
+
 def tokenize(text: str) -> list[str]:
     """Words for BM25: runs of letters/marks/digits (keeps Indic vowel signs); CJK as bigrams."""
     toks, cur = [], []
@@ -118,13 +123,16 @@ class KnowledgeBase:
                         if key in a.metadata_keys:
                             meta[key] = a.get_metadata(key).decode("utf-8", "replace")
                     iso3 = (meta.get("Language") or "").split(",")[0].strip()
-                    cat.append({"name": meta.get("Name") or f.stem, "file": f.name, "title": meta.get("Title", f.stem),
+                    name = meta.get("Name") or f.stem
+                    cat.append({"name": name, "file": f.name, "title": meta.get("Title", f.stem),
+                                "kind": zim_kind(name),
                                 "lang": self._iso3.get(iso3, iso3[:2] or "en"), "iso3": iso3,
                                 "date": meta.get("Date"), "size_mb": round(f.stat().st_size / 2**20),
                                 "articles": a.article_count, "fulltext": a.has_fulltext_index})
                     self._archives[f.name] = a
                 except Exception as exc:  # a broken/partial download must not hide the others
-                    cat.append({"name": f.stem, "file": f.name, "error": str(exc), "lang": "?", "fulltext": False})
+                    cat.append({"name": f.stem, "file": f.name, "error": str(exc), "lang": "?", "fulltext": False,
+                                "kind": zim_kind(f.stem)})
             self._catalog, self._stamp = cat, stamp
             return cat
 
@@ -134,13 +142,34 @@ class KnowledgeBase:
             self._archives[fname] = Archive(str(self.dir / fname))
         return self._archives[fname]
 
+    def by_name(self, name: str) -> dict | None:
+        """Catalogue entry for a ZIM ``Name`` (the newest file wins when several dates are installed)."""
+        hits = [z for z in self.catalog() if z.get("name") == name and "error" not in z]
+        return hits[-1] if hits else None
+
+    def read_entry(self, z: dict, path: str, max_redirects: int = 5) -> tuple[bytes, str, str]:
+        """(content, mimetype, final path) of one ZIM entry; KeyError if it does not exist."""
+        a = self._archive(z["file"])
+        if not path or not a.has_entry_by_path(path):
+            raise KeyError(path)
+        entry = a.get_entry_by_path(path)
+        for _ in range(max_redirects):
+            if not entry.is_redirect:
+                break
+            entry = entry.get_redirect_entry()
+        if entry.is_redirect:
+            raise KeyError(path)
+        item = entry.get_item()
+        return bytes(item.content), item.mimetype, entry.path
+
     def select(self, lang: str, subject: str) -> list[dict]:
         """Which collections to search (learner language first, then English), subject-matching first."""
         langs = [lang] + (["en"] if self.cfg["knowledge.include_english"] and lang != "en" else [])
         hints = SUBJECT_HINTS.get(subject, [])
         chosen = []
         for lg in langs:
-            zims = [z for z in self.catalog() if z.get("lang") == lg and "error" not in z]
+            zims = [z for z in self.catalog()
+                    if z.get("lang") == lg and "error" not in z and z.get("kind") == "text"]
             zims.sort(key=lambda z: (not any(h in z["name"].lower() for h in hints), -z.get("size_mb", 0)))
             chosen += zims[: int(self.cfg.get("knowledge.max_zims_per_language", 3))]
         return chosen

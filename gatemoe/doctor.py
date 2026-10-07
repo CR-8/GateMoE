@@ -34,6 +34,8 @@ def run_doctor(cfg: Config) -> int:
         size = f"{p.stat().st_size / 2**30:.2f} GB" if p.exists() else "missing"
         results.append(_line(OK if p.exists() else FAIL, f"{role} model", f"{p} ({size})"))
 
+    dot = shutil.which(cfg.get("paths.dot", "dot"))
+    results.append(_line(OK if dot else WARN, "graphviz (concept maps)", dot or "not found - apt install graphviz"))
     for tool in ("ffmpeg", "ffprobe"):
         path = shutil.which(cfg[f"paths.{tool}"]) or (cfg[f"paths.{tool}"] if Path(cfg[f"paths.{tool}"]).exists() else None)
         results.append(_line(OK if path else FAIL, tool, path or "not found"))
@@ -61,8 +63,15 @@ def run_doctor(cfg: Config) -> int:
     try:
         from .knowledge import KnowledgeBase
         zims = KnowledgeBase(cfg).catalog()
-        results.append(_line(OK if zims else WARN, "offline knowledge (ZIM)",
-                             f"{len(zims)} archives in {cfg['paths.zim_dir']}"))
+        text = [z for z in zims if z.get("kind") == "text"]
+        sims = [z for z in zims if z.get("kind") == "simulations"]
+        results.append(_line(OK if text else WARN, "offline knowledge (ZIM)",
+                             f"{len(text)} archives in {cfg['paths.zim_dir']}"))
+        results.append(_line(OK if sims else WARN, "simulations (PhET ZIM)",
+                             ", ".join(z["name"] for z in sims) or "none - add phet_<lang>_all ZIMs"))
+        broken = [z["file"] for z in zims if "error" in z]
+        if broken:
+            results.append(_line(WARN, "unreadable ZIM files", ", ".join(broken)))
     except Exception as exc:
         results.append(_line(WARN, "knowledge", str(exc)))
 

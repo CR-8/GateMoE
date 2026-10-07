@@ -2,7 +2,7 @@
 # Download everything GateMoE needs to run offline (run while online; resumable).
 #
 #   DATA_DIR=/mnt/hdd/gatemoe ./scripts/download_models.sh            # models + voices + starter ZIMs
-#   ZIMS="wikipedia_en_all_nopic wikipedia_kn_all_nopic" ./scripts/download_models.sh
+#   ZIMS="wikipedia_en_all_nopic wikipedia_kn_all_nopic phet_ta_all" ./scripts/download_models.sh
 #   SKIP_ZIMS=1 / SKIP_SPEECH=1 / SKIP_MMS=1 to skip parts
 set -euo pipefail
 DATA_DIR="${DATA_DIR:-/mnt/hdd/gatemoe}"
@@ -37,8 +37,10 @@ fi
 
 # ---- offline knowledge: Kiwix ZIM archives (latest file for each prefix)
 # Full English Wikipedia without pictures is ~53 GB, with pictures ~127 GB - both fit on 1 TB.
+# PhET interactive simulations: one ZIM per language (phet_<lang>_all, 60-150 MB; English is the fallback).
 ZIMS="${ZIMS:-wikipedia_en_physics_nopic wikipedia_en_chemistry_nopic wikipedia_en_mathematics_nopic \
-wikipedia_en_computer_nopic wikipedia_en_medicine_nopic wikipedia_hi_all_nopic wikipedia_kn_all_nopic}"
+wikipedia_en_computer_nopic wikipedia_en_medicine_nopic wikipedia_hi_all_nopic wikipedia_kn_all_nopic \
+phet_en_all phet_hi_all phet_kn_all}"
 if [ "${SKIP_ZIMS:-0}" != 1 ]; then
   for prefix in $ZIMS; do
     project="${prefix%%_*}"                                   # wikipedia, wikibooks, libretexts, ...

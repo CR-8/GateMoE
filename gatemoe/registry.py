@@ -24,7 +24,9 @@ def specialists(cfg: Config, pipeline=None) -> list[dict]:
     if pipeline is not None:
         try:
             for z in pipeline.kb.catalog():
-                out.append({"id": "knowledge:" + z["name"], "gateway": "knowledge", "available": True,
+                sims = z.get("kind") == "simulations"
+                out.append({"id": ("simulations:" if sims else "knowledge:") + z["name"],
+                            "gateway": "knowledge", "available": "error" not in z,
                             "size_mb": z.get("size_mb"), "lang": z.get("lang")})
         except Exception as exc:  # catalogue problems must not break the registry
             out.append({"id": "knowledge:error", "gateway": "knowledge", "available": False, "error": str(exc)})
@@ -41,6 +43,8 @@ def specialists(cfg: Config, pipeline=None) -> list[dict]:
             out.append({"id": "video:" + eng, "gateway": "video", "available": eng in engines})
         try:
             out.append({"id": "handout:typst", "gateway": "handout", "available": pipeline.handout.available()})
+            out.append({"id": "concept_map:graphviz", "gateway": "text",
+                        "available": pipeline.concept_map.available()})
         except Exception:
             pass
     ffmpeg = cfg.get("paths.ffmpeg", "ffmpeg")

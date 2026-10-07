@@ -7,16 +7,28 @@ import queue
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
+from urllib.parse import quote
+
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from ..config import Config, load_config
 from ..jobs import JobManager
+from ..knowledge import KnowledgeBase
 from ..router.clef import GATEWAYS
 from ..runtime import sysinfo
 
 STATIC = Path(__file__).parent / "static"
+# Offline archive content (PhET sims, Wikipedia articles) is third-party HTML/JS: it runs in a sandbox
+# with an opaque origin (no access to this app's API, cookies or storage) and may not open connections.
+ZIM_HEADERS = {
+    "Content-Security-Policy": "sandbox allow-scripts; default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; "
+                               "connect-src 'none'; form-action 'none'; base-uri 'none'; frame-ancestors 'self'",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer",
+    "Cache-Control": "public, max-age=86400",
+}
 
 
 class LessonIn(BaseModel):
@@ -34,6 +46,7 @@ def create_app(cfg: Config | None = None, jobs: JobManager | None = None) -> Fas
         jobs = JobManager(cfg, lambda: LessonPipeline(cfg))
     app = FastAPI(title="GateMoE", docs_url="/api/docs")
     app.state.cfg, app.state.jobs = cfg, jobs
+    kb = KnowledgeBase(cfg)
 
     @app.get("/", response_class=HTMLResponse)
     def index() -> HTMLResponse:
@@ -134,6 +147,26 @@ def create_app(cfg: Config | None = None, jobs: JobManager | None = None) -> Fas
         target = (root / name).resolve()
         if root not in target.parents or not target.is_file():
             raise HTTPException(404, "no such file")
-        return FileResponse(target)
+        headers = {"X-Content-Type-Options": "nosniff"}
+        if target.suffix.lower() in (".svg", ".html", ".htm", ".xml"):   # never script in this origin
+            headers["Content-Security-Policy"] = "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:"
+        return FileResponse(target, headers=headers)
+
+    @app.get("/zim/{zim}/{path:path}")
+    def zim_entry(zim: str, path: str) -> Response:
+        """Serve one entry of an installed ZIM (simulations, offline articles) like kiwix-serve."""
+        z = kb.by_name(zim)
+        if z is None:
+            raise HTTPException(404, "no such archive")
+        try:
+            if not path:
+                main = kb._archive(z["file"]).main_entry
+                path = main.get_redirect_entry().path if main.is_redirect else main.path
+            content, mime, final = kb.read_entry(z, path)
+        except (KeyError, RuntimeError):
+            raise HTTPException(404, "no such entry")
+        if final != path:   # redirect so that relative links inside the page resolve correctly
+            return RedirectResponse(f"/zim/{quote(zim)}/{quote(final)}", status_code=302, headers=ZIM_HEADERS)
+        return Response(content, media_type=mime or "application/octet-stream", headers=ZIM_HEADERS)
 
     return app

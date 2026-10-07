@@ -28,6 +28,12 @@
     list(..d.key_points.map(k => [#k])))
 ]
 
+#if d.concept_map != none [
+  == #d.labels.concept_map
+  // Graphviz SVG produced by GateMoE itself (labels escaped there); Typst draws its text with the handout fonts
+  #align(center, image(bytes(d.concept_map), format: "svg", width: d.concept_map_w * 1pt))
+]
+
 #if d.glossary.len() > 0 [
   == #d.labels.glossary
   #table(columns: (auto, 1fr), stroke: 0.4pt + luma(200), inset: 6pt,
@@ -56,6 +62,12 @@
   #for (n, q) in d.quiz.enumerate() [
     *#(n + 1).* #("abcd".at(q.answer_index)) — #q.explanation \
   ]
+]
+
+#if d.simulations.len() > 0 [
+  == #d.labels.simulations
+  #text(size: 8.5pt, fill: gray, d.labels.sim_hint)
+  #for s in d.simulations [- #s \ ]
 ]
 
 #if d.sources.len() > 0 [

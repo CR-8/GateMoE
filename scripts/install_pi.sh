@@ -19,7 +19,7 @@ log "System packages"
 sudo apt-get update
 sudo apt-get install -y build-essential cmake git curl ca-certificates bzip2 pkg-config \
   python3 python3-venv python3-dev libcairo2-dev libpango1.0-dev ffmpeg \
-  fonts-noto-core fonts-noto-cjk util-linux
+  fonts-noto-core fonts-noto-cjk util-linux graphviz
 # Browser for HyperFrames (package name differs between Debian releases)
 sudo apt-get install -y chromium || sudo apt-get install -y chromium-browser
 sudo apt-get install -y chromium-headless-shell 2>/dev/null || true   # faster BeginFrame capture when available

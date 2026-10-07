@@ -26,7 +26,7 @@ Plan a short lesson. Give a clear title, 1-3 short English search queries for an
 0-2 short search queries in {lang_name} (empty if {lang_name} is English) and 2-6 key terms.""",
     "notes": """Learner request: {request}
 Write concise study notes: 3-4 sections with a heading and a short body (plain text with simple Markdown such as **bold** and - lists; formulas inline like F = m·a), \
-then 3-6 key points and a glossary of 2-8 terms.""",
+then 3-6 key points and a glossary of 2-8 terms.{concept_map}""",
     "flashcards": """Learner request: {request}
 Write exactly {n} flashcards. Front: one precise question or term. Back: a short, correct answer (one or two sentences).""",
     "quiz": """Learner request: {request}
@@ -50,6 +50,12 @@ Equations use Typst math syntax (e.g. "f(x) = x^2", "(d)/(d x) x^2 = 2x", "integ
 Expressions for graphs use Python syntax in x (e.g. "x**2 - 1", "sin(x)"). \
 Narration: 1-3 spoken sentences per beat in {lang_name}, written exactly as it should be spoken (no symbols or code).{spoken_rules}""",
 }
+
+
+CONCEPT_MAP_HINT = """
+Finally a concept map: 4-10 links between the lesson's key concepts, each with "from" and "to" (a concept in 1-4 words) \
+and "label" (a short relation such as "is measured in", "causes", "is a type of"). Write the same concept with exactly \
+the same words every time it appears, so the links join into one connected map."""
 
 
 def pack_sources(passages: list[dict], max_chars: int) -> str:
@@ -109,8 +115,10 @@ class TextGateway:
     def generate(self, task: str, video_engine: str | None = None) -> dict:
         mt = self._budget(task)
         if task == "notes":
-            return self.gen.chat_json(self._messages(self._fmt("notes")), schemas.notes_schema(),
-                                      name="notes", max_tokens=mt)
+            cmap = bool(self.cfg.get("generation.concept_map", True))
+            hint = CONCEPT_MAP_HINT if cmap else ""
+            return self.gen.chat_json(self._messages(self._fmt("notes", concept_map=hint)),
+                                      schemas.notes_schema(cmap), name="notes", max_tokens=mt)
         if task == "flashcards":
             n = int(self.cfg["generation.flashcards"])
             return self.gen.chat_json(self._messages(self._fmt("flashcards", n=n)),

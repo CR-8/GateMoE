@@ -46,13 +46,16 @@ def plan_schema() -> dict:
     })
 
 
-def notes_schema() -> dict:
-    return _obj({
+def notes_schema(concept_map: bool = True) -> dict:
+    props = {
         "title": _str(120),
         "sections": _arr(_obj({"heading": _str(100), "body": _str(700, 20)}), 3, 4),
         "key_points": _arr(_str(160), 3, 6),
         "glossary": _arr(_obj({"term": _str(60), "definition": _str(200)}), 2, 6),
-    })
+    }
+    if concept_map:   # rendered by Graphviz (gateways/conceptmap.py); the model writes only triples
+        props["concept_map"] = _arr(_obj({"from": _str(40), "label": _str(30, 0), "to": _str(40)}), 4, 10)
+    return _obj(props)
 
 
 def flashcards_schema(n: int) -> dict:

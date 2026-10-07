@@ -16,11 +16,13 @@ import time
 from pathlib import Path
 
 from .config import Config
+from .gateways.conceptmap import ConceptMapGateway
 from .gateways.handout import HandoutGateway
 from .gateways.speech import SpeechGateway
 from .gateways.text import TextGateway
 from .gateways.video import VideoGateway
 from .knowledge import KnowledgeBase
+from .knowledge.phet import SimulationFinder
 from .langid import detect_language
 from .llm.client import Generator
 from .registry import specialists
@@ -41,6 +43,8 @@ class LessonPipeline:
         self.speech = SpeechGateway(cfg)
         self.video = VideoGateway(cfg)
         self.handout = HandoutGateway(cfg)
+        self.concept_map = ConceptMapGateway(cfg)
+        self.sims = SimulationFinder(cfg, self.kb)
 
     def _pick_engine(self, wanted: str) -> str | None:
         engines = self.video.available_engines()
@@ -142,6 +146,24 @@ class LessonPipeline:
                               "excerpt": (p.get("text") or "")[:400]} for p in passages]
         tg.set_sources(passages)
 
+        # interactive simulations (PhET ZIMs): deterministic title matching, no model time
+        if self.sims.available():
+            try:
+                with ev.stage("simulations") as st:
+                    sim_q = [(q, "en") for q in plan.get("search_queries_en", [])]
+                    sim_q += [(q, code) for q in plan.get("search_queries_native", []) + plan.get("key_terms", [])]
+                    sim_q += [(plan.get("title", ""), code), (request, code)]
+                    sims = self.sims.find(sim_q, code, decision.subject)
+                    st.update(found=[s["id"] for s in sims])
+                if sims:
+                    lesson["simulations"] = sims
+                    for z in sorted({s["zim"] for s in sims}):
+                        activated.append("simulations:" + z)
+            except Cancelled:
+                raise
+            except Exception as exc:
+                lesson["errors"]["simulations"] = f"{type(exc).__name__}: {exc}"
+
         for task in selected:
             ev.check_cancel()
             try:
@@ -219,7 +241,16 @@ class LessonPipeline:
             except Exception as exc:
                 lesson["errors"]["video_render"] = f"{type(exc).__name__}: {exc}"
 
-        # 7. exports: Markdown, Anki TSV and a printable Typst handout (no LLM time) ------------
+        # 7. concept map (Graphviz), exports and a printable Typst handout (no LLM time) ---------
+        cmap = (lesson.get("notes") or {}).get("concept_map")
+        if cmap and self.concept_map.available():
+            try:
+                with ev.stage("concept_map") as st:
+                    lesson["concept_map"] = self.concept_map.render(cmap, code, out_dir)
+                    st.update(nodes=lesson["concept_map"]["nodes"], edges=lesson["concept_map"]["edges"])
+                activated.append("concept_map:graphviz")
+            except Exception as exc:
+                lesson["errors"]["concept_map"] = f"{type(exc).__name__}: {exc}"
         with ev.stage("package"):
             write_exports(lesson, out_dir)
         if any(k in lesson for k in ("notes", "quiz", "flashcards")) and self.handout.available():
@@ -241,7 +272,12 @@ def write_exports(lesson: dict, out_dir: Path) -> None:
         if notes.get("key_points"):
             md += ["## Key points", ""] + [f"- {k}" for k in notes["key_points"]] + [""]
         if notes.get("glossary"):
-            md += ["## Glossary", ""] + [f"- **{g['term']}**: {g['definition']}" for g in notes["glossary"]]
+            md += ["## Glossary", ""] + [f"- **{g['term']}**: {g['definition']}" for g in notes["glossary"]] + [""]
+        if (lesson.get("concept_map") or {}).get("svg"):
+            md += ["## Concept map", "", f"![Concept map]({lesson['concept_map']['svg']})", ""]
+        if lesson.get("simulations"):
+            md += ["## Interactive simulations (PhET, offline)", ""] + [
+                f"- {s['title']} ({s['zim']}/{s['path']})" for s in lesson["simulations"]]
         (out_dir / "notes.md").write_text("\n".join(md), encoding="utf-8")
     cards = (lesson.get("flashcards") or {}).get("cards")
     if cards:

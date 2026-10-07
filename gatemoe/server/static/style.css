@@ -71,4 +71,10 @@ video, audio { width: 100%; max-width: 100%; border-radius: 8px; }
 .turn { margin: 4px 0; } .turn b { color: var(--accent); }
 .err { color: var(--bad); }
 .src { border-left: 3px solid var(--line); padding-left: 8px; margin: 8px 0; font-size: .9rem; }
+.cmap { display: block; max-width: 100%; height: auto; background: #fff; border-radius: 8px; padding: 8px; margin: .3rem 0; }
+.sim { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; align-items: center; border: 1px solid var(--line); border-radius: 10px; padding: 10px; margin: 8px 0; }
+.sim img { width: 96px; height: auto; border-radius: 6px; }
+.sim p { margin: .1rem 0 .4rem; font-size: .85rem; }
+.sim .row { margin: 0; } .sim .row a { font-size: .9rem; }
+.simstage iframe { display: block; width: 100%; aspect-ratio: 16 / 10; border: 0; border-radius: 8px; background: #000; margin: 10px 0; }
 .foot { text-align: center; color: var(--muted); font-size: .75rem; padding: 16px; }

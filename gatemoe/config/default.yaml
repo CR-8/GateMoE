@@ -14,6 +14,7 @@ paths:
   chrome: /usr/bin/chromium                   # browser used by HyperFrames (Debian chromium on the Pi)
   ffmpeg: ffmpeg
   ffprobe: ffprobe
+  dot: dot                 # Graphviz, for concept maps (apt install graphviz)
   node: node
   python: null                                # interpreter for the Manim subprocess (null = current)
 
@@ -79,14 +80,25 @@ knowledge:
   max_source_chars: 6000   # hard cap on SOURCES text (keeps Pi prefill time bounded)
   include_english: true    # also search English ZIMs for non-English requests
 
+simulations:               # PhET interactive simulations from phet_<lang>_all ZIMs (title matching, no LLM)
+  enabled: true
+  max_results: 3
+  min_score: 0.5           # share of a sim title's distinctive words the lesson mentions
+
+concept_map:               # Graphviz rendering of the notes' concept links
+  png_dpi: 150
+  timeout_s: 60
+  cpu_seconds: 30
+
 generation:
   flashcards: 8
   quiz_questions: 5
   podcast_turns: 10
   video_beats: 6
+  concept_map: true         # notes include concept links, drawn by Graphviz (`dot`)
   max_tokens:
     plan: 400
-    notes: 900
+    notes: 1100
     flashcards: 900
     quiz: 1200
     podcast: 1400
