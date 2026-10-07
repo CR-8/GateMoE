@@ -78,3 +78,18 @@ is in section 4. Lesson: one sample per task hid a failure mode; check several s
 The same check exposed a prompt/schema contradiction for non-English learners (prompt "0-2 native
 queries", schema "at least 1"): the model tried to write an empty list and the grammar forced a junk
 string. The plan prompt now states the same count as the schema for each language.
+
+## 4. Final: spaced compact grammar (the default)
+
+Same requests, `compact` variant = `json_spaces=True` (results files hold all three variants):
+
+| lesson | tasks | `json_schema` | no-space GBNF | **spaced GBNF (default)** |
+|---|---|---|---|---|
+| English | notes + quiz + video | 488 s | 236 s (but derails plans) | **283 s (-42 %)** |
+| Kannada | notes + quiz + podcast | 714 s | 617 s | **584 s (-18 %)** |
+
+Per task (spaced): English notes 311 -> 128 s (the baseline's first notes call hit the 1100-token cap
+because of indentation and was retried), quiz 93 -> 81 s, video 84 -> 73 s; Kannada notes 369 -> 278 s,
+quiz 211 -> 171 s, podcast 135 -> 135 s. Throughput unchanged (7.0 / 6.6 t/s). Outputs checked by
+hand: English quiz/video plan and Kannada notes/quiz/podcast are well-formed and on topic.
+Caveat: one request per task and language on x86; repeat on the Pi with more requests.

@@ -46,8 +46,8 @@ findings ...") except: podcast TTS checks for cancel only between lessons stages
 
 ### B. Optimisation work (deep, measured)
 
-1. **Generator speed.** Done on x86 (see `research/genbench/README.md`): compact-JSON grammar is now
-   the default (-52 % English, -14 % Kannada generation time); draft-model speculation with
+1. **Generator speed.** Done on x86 (see `research/genbench/README.md`): compact-JSON grammar (one optional
+   space after ':' and ',', no newlines) is now the default (-42 % English, -18 % Kannada generation time); draft-model speculation with
    Qwen3.5-0.8B accepted 71 % of tokens but ran slower (6.2 vs 7.0 t/s) and n-gram lookup accepted 7 %.
    Next: repeat `genbench --variants baseline,compact,draft-0.8b-n2,draft-0.8b-n4` on the Pi 5
    (memory-bound decode may change the speculation result), and with more requests per task.
