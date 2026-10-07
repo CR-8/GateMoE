@@ -38,7 +38,8 @@ def variants(draft_model: str | None, threads: int) -> dict[str, tuple[list[str]
     """name -> (extra llama-server args, Generator options)"""
     v = {
         "baseline": ([], {}),
-        "compact": ([], {"compact_json": True}),                  # GBNF without layout whitespace
+        "compact": ([], {"compact_json": True, "json_spaces": True}),          # GBNF: ": " / ", " only
+        "compact-nospace": ([], {"compact_json": True, "json_spaces": False}),  # GBNF: no whitespace at all
         "ngram-simple": (["--spec-type", "ngram-simple"], {}),
         "ngram-map-k": (["--spec-type", "ngram-map-k"], {}),
         "ngram-mod": (["--spec-type", "ngram-mod"], {}),

@@ -39,8 +39,10 @@ def cfg(tmp_path: Path, fake_server_exe: Path):
     c = load_config(overrides={
         "paths": {"data_dir": str(data), "llama_server": str(fake_server_exe)},
         "llama": {"ready_timeout_s": 20, "stop_timeout_s": 5},
+        # the fake server answers from response_format, so the json_schema path is used here;
+        # the compact-grammar request is covered by test_compact_json_request in test_core.py
         "models": {"router": {"file": "router.gguf", "port": free_port()},
-                   "generator": {"file": "gen.gguf", "port": free_port()}},
+                   "generator": {"file": "gen.gguf", "port": free_port(), "compact_json": False}},
         "server": {"sys_interval_s": 0.5, "allowed_hosts": ["testserver"]},
     })
     c.ensure_dirs()

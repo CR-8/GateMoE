@@ -33,7 +33,8 @@ def _extract_json(text: str) -> Any:
 
 class Generator:
     def __init__(self, base_url: str, *, timeout: float = 3600, temperature: float = 0.4,
-                 disable_thinking: bool = True, events: EventLog | None = None, compact_json: bool = False):
+                 disable_thinking: bool = True, events: EventLog | None = None, compact_json: bool = False,
+                 json_spaces: bool = True):
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.temperature = temperature
@@ -41,6 +42,9 @@ class Generator:
         self.events = events
         self.last_content = ""      # raw text of the last completion (debugging, token accounting)
         self.compact_json = compact_json
+        # keep ": " / ", " legal: with every space forbidden Qwen3.5 wrote placeholder strings such as
+        # [":[0]", "[1]"] in 2 of 3 plans (research/genbench/README.md); newlines/indents stay banned
+        self.json_spaces = json_spaces
 
     def chat_json(self, messages: list[dict], schema: dict, *, name: str, max_tokens: int,
                   temperature: float | None = None, seed: int = 7, retries: int = 1) -> dict:
@@ -54,7 +58,7 @@ class Generator:
         grammar = None
         if self.compact_json:   # same constraints without layout whitespace (fewer generated tokens)
             try:
-                grammar = schema_to_gbnf(schema)
+                grammar = schema_to_gbnf(schema, spaces=self.json_spaces)
             except Unsupported:
                 grammar = None
         if grammar:

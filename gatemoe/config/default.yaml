@@ -51,7 +51,7 @@ models:
     disable_thinking: true
     # Constrain output with GateMoE's own GBNF (no indentation/newlines between JSON tokens) instead of
     # llama-server's json_schema conversion, which lets the model pretty-print. See research/genbench.
-    compact_json: false
+    compact_json: true          # measured: -52 % generation time (English lesson), -14 % (Kannada)
 
 router:
   mode: clef               # clef = Clef-flash decides; all = every gateway (baseline); manual = user picks

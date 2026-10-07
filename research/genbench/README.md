@@ -46,3 +46,35 @@ and Qwen3.5 pretty-prints. `results/x86-4t_en_baseline-vs-compact.json` (English
 Throughput is unchanged (7.0 t/s): the custom grammar is not slower to sample; all savings are
 tokens not generated plus the avoided truncation retry. Output shape is comparable (notes: 4
 sections, 10 concept links; quiz: 5 questions; video: 6 beats vs 5).
+
+Kannada (`results/x86-4t_kn_baseline-vs-compact.json`, same machine): whitespace is a smaller share
+because Kannada text needs ~2.3x the tokens of English, but the saving holds:
+
+| task | baseline | compact | whitespace share of baseline tokens |
+|---|---|---|---|
+| notes | 369 s | 341 s (compact wrote ~40 % longer sections) | 15 % |
+| quiz | 211 s | 159 s | 13 % |
+| podcast | 135 s | 118 s | 19 % |
+| total | 714 s | 617 s | **-14 %** |
+
+**Decision:** `models.generator.compact_json: true` is the default. One sample per task and
+language (temperature 0.4, seed 7): re-run with more requests before quoting the exact numbers.
+
+## 3. Correction: "no whitespace at all" derails the model; allow ": " and ", "
+
+The section 2 runs used a grammar with **no** whitespace. Checking the plan request (three seeds per
+mode, English lesson) showed that forbidding every space pushes Qwen3.5 into unusual token sequences:
+
+| mode | clean plans | tokens |
+|---|---|---|
+| `json_schema` (llama-server) | 3 / 3 | 93-122 |
+| GBNF, no whitespace | **1 / 3** (`[":[0]","[1]","[2]"]`, `"> Ohm's law ..."`) | 55-72 |
+| GBNF, optional single space after `:` and `,` | 3 / 3 | 73-81 |
+
+The default is therefore the spaced form (`Generator(json_spaces=True)`): newlines and indentation -
+most of the waste - stay banned. Section 2's numbers are for the no-space grammar; the spaced re-run
+is in section 4. Lesson: one sample per task hid a failure mode; check several seeds.
+
+The same check exposed a prompt/schema contradiction for non-English learners (prompt "0-2 native
+queries", schema "at least 1"): the model tried to write an empty list and the grammar forced a junk
+string. The plan prompt now states the same count as the schema for each language.

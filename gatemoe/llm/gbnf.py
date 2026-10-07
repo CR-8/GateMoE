@@ -30,7 +30,8 @@ def _lit(text: str) -> str:
 
 
 class _Builder:
-    def __init__(self):
+    def __init__(self, sep: str = ""):
+        self.sep = sep                     # GBNF fragment allowed after ':' and ',' ("" = nothing)
         self.rules: dict[str, str] = {}
         self.by_body: dict[str, str] = {}
         self.base: set[str] = set()
@@ -77,7 +78,7 @@ class _Builder:
             if hi == 0:
                 return self.add(hint, '"[]"')
             more_lo, more_hi = max(0, lo - 1), hi - 1
-            tail = f' ("," {item}){{{more_lo},{more_hi}}}' if more_hi > 0 else ""
+            tail = f' ("," {self.sep}{item}){{{more_lo},{more_hi}}}' if more_hi > 0 else ""
             inner = f"{item}{tail}"
             body = f'"[" {inner} "]"' if lo >= 1 else f'"[" ({inner})? "]"'
             return self.add(hint, body)
@@ -92,16 +93,18 @@ class _Builder:
             parts = []
             for i, k in enumerate(required):
                 v = self.visit(props[k], f"{hint}-{k}")
-                parts.append(("" if i == 0 else '"," ') + f'{_lit(json.dumps(k))} ":" {v}')
+                parts.append(("" if i == 0 else f'"," {self.sep}') + f'{_lit(json.dumps(k))} ":" {self.sep}{v}')
             for k in optional:
                 v = self.visit(props[k], f"{hint}-{k}")
-                parts.append(f'("," {_lit(json.dumps(k))} ":" {v})?')
+                parts.append(f'("," {self.sep}{_lit(json.dumps(k))} ":" {self.sep}{v})?')
             return self.add(hint, '"{" ' + " ".join(parts) + ' "}"')
         raise Unsupported(f"schema type {t!r}")
 
 
-def schema_to_gbnf(schema: dict) -> str:
-    b = _Builder()
+def schema_to_gbnf(schema: dict, spaces: bool = False) -> str:
+    """``spaces=True`` allows one optional space after ':' and ',' (json.dumps style), still no
+    newlines or indentation."""
+    b = _Builder('" "? ' if spaces else "")
     root = b.visit(schema, "root-obj")
     lines = [f"root ::= {root}"]
     lines += [f"{name} ::= {body}" for name, body in b.rules.items()]
