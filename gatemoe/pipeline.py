@@ -128,7 +128,8 @@ class LessonPipeline:
         activated.append("generator:" + cfg["models.generator.file"])
         gen = Generator(server.base_url, timeout=float(cfg["models.generator.request_timeout_s"]),
                         temperature=float(cfg["models.generator.temperature"]),
-                        disable_thinking=bool(cfg["models.generator.disable_thinking"]), events=ev)
+                        disable_thinking=bool(cfg["models.generator.disable_thinking"]), events=ev,
+                        compact_json=bool(cfg.get("models.generator.compact_json", False)))
         tts_engine = self.speech.engine_for(code)
         tg = TextGateway(cfg, gen, code, decision, request, tts_engine=tts_engine)
         try:
