@@ -1,0 +1,314 @@
+{
+ "runs": [
+  {
+   "variant": "baseline",
+   "args": [],
+   "load_s": 2.7,
+   "tasks": {
+    "quiz": {
+     "wall_s": 164.25,
+     "calls": 2,
+     "generated": 1052,
+     "prompt_n": 1230,
+     "cached": 1222,
+     "gen_tps": [
+      6.88,
+      7.13
+     ],
+     "prompt_tps": [
+      84.72,
+      12.48
+     ],
+     "draft_n": 0,
+     "draft_accepted": 0,
+     "finish": [
+      "length",
+      "stop"
+     ],
+     "error": null,
+     "output": {
+      "questions": [
+       {
+        "question": "According to Ohm's law, what happens to the current flowing through a resistor if the voltage across it is doubled, assuming the resistance remains constant?",
+        "options": [
+         "The current remains unchanged.",
+         "The current doubles.",
+         "The current is halved.",
+         "The current quadruples."
+        ],
+        "answer_index": 1,
+        "explanation": "Ohm's law states that current is directly proportional to voltage, so doubling the voltage doubles the current."
+       },
+       {
+        "question": "Which of the following units is the SI derived unit for electrical conductance, which is the reciprocal of resistance?",
+        "options": [
+         "The ohm (Ω)",
+         "The volt (V)",
+         "The siemens (S)",
+         "The ampere (A)"
+        ],
+        "answer_index": 2,
+        "explanation": "The siemens (S) is the SI unit for conductance, defined as one reciprocal ohm (1 S = 1/Ω)."
+       },
+       {
+        "question": "In the context of Ohm's law, what characterizes a 'linear resistor'?",
+        "options": [
+         "Its resistance changes significantly with temperature.",
+         "Its resistance varies with the applied voltage.",
+         "Its resistance value is constant over a useful range of currents.",
+         "Its resistance depends on the frequency of the applied current."
+        ],
+        "answer_index": 2,
+        "explanation": "A linear resistor is defined by having a constant resistance value over a useful range of applied voltages or currents."
+       },
+       {
+        "question": "If a material does not obey Ohm's law because its resistance changes with the current flowing through it, it is called:",
+        "options": [
+         "A linear resistor.",
+         "A non-ohmic material.",
+         "A superconductor.",
+         "An ideal conductor."
+        ],
+        "answer_index": 1,
+        "explanation": "Materials where resistance is not constant and thus do not strictly follow the linear relationship of Ohm's law are termed non-ohmic."
+       },
+       {
+        "question": "Which formula correctly represents the relationship between power (P), resistance (R), and current (I) in a resistor?",
+        "options": [
+         "P = R × I",
+         "P = V / I",
+         "P = I² × R",
+         "P = V × R"
+        ],
+        "answer_index": 2,
+        "explanation": "Power dissipated by a resistor can be calculated using the formula P = I²R, which combines Ohm's law and Joule's law."
+       }
+      ]
+     }
+    }
+   },
+   "passages": [
+    "Ohm",
+    "Ohm",
+    "Ohm's law",
+    "Ohm's law",
+    "Ohm's law"
+   ],
+   "peak_rss_mb": 3297,
+   "total_s": 168.21,
+   "time": "2026-10-07 03:49:26"
+  },
+  {
+   "variant": "ngram-simple",
+   "args": [
+    "--spec-type",
+    "ngram-simple"
+   ],
+   "load_s": 2.1,
+   "tasks": {
+    "quiz": {
+     "wall_s": 167.87,
+     "calls": 2,
+     "generated": 1043,
+     "prompt_n": 1230,
+     "cached": 1222,
+     "gen_tps": [
+      6.82,
+      6.78
+     ],
+     "prompt_tps": [
+      85.58,
+      12.81
+     ],
+     "draft_n": 384,
+     "draft_accepted": 27,
+     "finish": [
+      "length",
+      "stop"
+     ],
+     "error": null,
+     "output": {
+      "questions": [
+       {
+        "question": "According to Ohm's law, what happens to the current flowing through a resistor if the voltage across it is doubled, assuming the resistance remains constant?",
+        "options": [
+         "The current remains unchanged.",
+         "The current doubles.",
+         "The current is halved.",
+         "The current quadruples."
+        ],
+        "answer_index": 1,
+        "explanation": "Ohm's law states that current is directly proportional to voltage, so doubling the voltage doubles the current."
+       },
+       {
+        "question": "Which of the following units is the SI derived unit for electrical conductance, which is the reciprocal of resistance?",
+        "options": [
+         "The ohm (Ω)",
+         "The volt (V)",
+         "The siemens (S)",
+         "The ampere (A)"
+        ],
+        "answer_index": 2,
+        "explanation": "The siemens (S) is the SI unit for conductance, defined as one reciprocal ohm (1 S = 1/Ω)."
+       },
+       {
+        "question": "In the context of Ohm's law, what characterizes a 'linear resistor'?",
+        "options": [
+         "Its resistance changes significantly with temperature.",
+         "Its resistance varies depending on the applied voltage.",
+         "Its resistance value is constant over a useful range of currents or voltages.",
+         "It only allows current to flow in one direction."
+        ],
+        "answer_index": 2,
+        "explanation": "A linear resistor is defined by having a constant resistance value that does not vary with the applied voltage or current."
+       },
+       {
+        "question": "If a circuit has a resistance of 100 ohms and a current of 0.05 amperes flows through it, what is the voltage across the resistor?",
+        "options": [
+         "5000 V",
+         "5 V",
+         "20 V",
+         "0.00005 V"
+        ],
+        "answer_index": 1,
+        "explanation": "Using the formula V = I × R, multiplying 0.05 A by 100 Ω yields 5 volts."
+       },
+       {
+        "question": "Which material is cited as an example of a non-linear resistor where resistance varies with temperature?",
+        "options": [
+         "Copper wire",
+         "Silver",
+         "Thermistor",
+         "Gold"
+        ],
+        "answer_index": 2,
+        "explanation": "A thermistor is a specific type of resistor whose resistance exhibits a strong dependence on temperature, making it non-linear."
+       }
+      ]
+     }
+    }
+   },
+   "passages": [
+    "Ohm",
+    "Ohm",
+    "Ohm's law",
+    "Ohm's law",
+    "Ohm's law"
+   ],
+   "peak_rss_mb": 3394,
+   "total_s": 170.23,
+   "time": "2026-10-07 03:52:16"
+  },
+  {
+   "variant": "draft-0.8b-n4",
+   "args": [
+    "--spec-type",
+    "draft-simple",
+    "-md",
+    "/tmp/claude-0/-home-user-GateMoE/fb8f141f-48cd-5abb-adc1-ed41947d5a7d/scratchpad/models/Qwen3.5-0.8B-Q4_K_M.gguf",
+    "--spec-draft-n-max",
+    "4",
+    "-td",
+    "4"
+   ],
+   "load_s": 3.71,
+   "tasks": {
+    "quiz": {
+     "wall_s": 190.66,
+     "calls": 2,
+     "generated": 1074,
+     "prompt_n": 1230,
+     "cached": 1222,
+     "gen_tps": [
+      6.12,
+      6.32
+     ],
+     "prompt_tps": [
+      66.36,
+      10.4
+     ],
+     "draft_n": 999,
+     "draft_accepted": 714,
+     "finish": [
+      "length",
+      "stop"
+     ],
+     "error": null,
+     "output": {
+      "questions": [
+       {
+        "question": "According to Ohm's law, what happens to the current flowing through a resistor if the voltage across it is doubled while the resistance remains constant?",
+        "options": [
+         "The current remains unchanged.",
+         "The current doubles.",
+         "The current is halved.",
+         "The current quadruples."
+        ],
+        "answer_index": 1,
+        "explanation": "Ohm's law states that current is directly proportional to voltage, so doubling the voltage results in doubling the current."
+       },
+       {
+        "question": "Which of the following best describes the relationship between voltage (V), current (I), and resistance (R) in a linear resistor?",
+        "options": [
+         "V = I * R",
+         "I = V * R",
+         "R = V / I",
+         "I = V - R"
+        ],
+        "answer_index": 0,
+        "explanation": "The standard form of Ohm's law defines voltage as the product of current and resistance (V = I * R)."
+       },
+       {
+        "question": "A material is considered 'non-ohmic' if its resistance changes significantly based on which of the following factors?",
+        "options": [
+         "The color of the material.",
+         "The temperature or applied voltage.",
+         "The brand of the manufacturer.",
+         "The physical shape of the wire."
+        ],
+        "answer_index": 1,
+        "explanation": "Non-ohmic materials, such as thermistors, have resistance values that vary depending on parameters like temperature or voltage, violating the constant R assumption of Ohm's law."
+       },
+       {
+        "question": "If a circuit has a resistance of 10 ohms and a current of 2 amperes flows through it, what is the voltage drop across the resistor?",
+        "options": [
+         "20 volts",
+         "5 volts",
+         "0.2 volts",
+         "12 volts"
+        ],
+        "answer_index": 0,
+        "explanation": "Using the formula V = I * R, multiplying 2 amperes by 10 ohms yields a voltage of 20 volts."
+       },
+       {
+        "question": "In the context of Ohm's law, what does the term 'linear resistor' imply about the resistance value?",
+        "options": [
+         "It is always zero.",
+         "It remains constant over a useful range of currents or voltages.",
+         "It increases exponentially with voltage.",
+         "It fluctuates randomly over time."
+        ],
+        "answer_index": 1,
+        "explanation": "A linear resistor is defined as having a constant resistance value over a specific range of applied voltages or currents, allowing Ohm's law to apply directly."
+       }
+      ]
+     }
+    }
+   },
+   "passages": [
+    "Ohm",
+    "Ohm",
+    "Ohm's law",
+    "Ohm's law",
+    "Ohm's law"
+   ],
+   "peak_rss_mb": 4201,
+   "total_s": 194.74,
+   "time": "2026-10-07 03:55:31"
+  }
+ ],
+ "lesson": "/tmp/claude-0/-home-user-GateMoE/fb8f141f-48cd-5abb-adc1-ed41947d5a7d/scratchpad/e2e/data/jobs/e2e_en/lesson.json",
+ "tasks": "quiz",
+ "threads": 4,
+ "generator": "Qwen3.5-4B-Q4_K_M.gguf"
+}
