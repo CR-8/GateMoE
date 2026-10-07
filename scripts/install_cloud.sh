@@ -37,11 +37,16 @@ export DEBIAN_FRONTEND=noninteractive
 export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0='*'
 
 log()  { printf '\n\033[1;34m== %s\033[0m\n' "$*"; }
-imds() {  # EC2 instance metadata (IMDSv2); prints nothing on other clouds / errors
+cloud_meta() {  # $1 = ip | hostname. AWS IMDSv2, then Google Cloud; prints nothing elsewhere
   local tok
-  tok="$(curl -sf -m 2 --noproxy '*' -X PUT http://169.254.169.254/latest/api/token \
-         -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' 2>/dev/null)" || return 0
-  curl -sf -m 2 --noproxy '*' -H "X-aws-ec2-metadata-token: $tok" "http://169.254.169.254/latest/meta-data/$1" 2>/dev/null || true
+  if tok="$(curl -sf -m 2 --noproxy '*' -X PUT http://169.254.169.254/latest/api/token \
+            -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' 2>/dev/null)"; then
+    curl -sf -m 2 --noproxy '*' -H "X-aws-ec2-metadata-token: $tok" \
+      "http://169.254.169.254/latest/meta-data/$([ "$1" = ip ] && echo public-ipv4 || echo public-hostname)" 2>/dev/null || true
+  elif [ "$1" = ip ]; then
+    curl -sf -m 2 --noproxy '*' -H 'Metadata-Flavor: Google' \
+      http://169.254.169.254/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip 2>/dev/null || true
+  fi
 }
 warn() { printf '\033[1;33m!! %s\033[0m\n' "$*" >&2; }
 die()  { printf '\033[1;31mERROR: %s\033[0m\n' "$*" >&2; exit 1; }
@@ -159,7 +164,7 @@ if [ ! -f "$ENV_FILE" ] || [ -n "${GATEMOE_PASSWORD:-}" ]; then
   PASS="${GATEMOE_PASSWORD:-$(openssl rand -base64 15 | tr -d '/+=' | cut -c1-16)}"
   case "$PASS" in *"'"*|*$'\n'*) die "GATEMOE_PASSWORD must not contain quotes or newlines";; esac
   # names the browser may use for this server (IP addresses are always allowed)
-  PUB_DNS="$(imds public-hostname)"
+  PUB_DNS="$(cloud_meta hostname)"
   [[ "$PUB_DNS" =~ ^[A-Za-z0-9.-]+$ ]] || PUB_DNS=""
   umask 077
   cat > "$ENV_FILE" <<EOF
@@ -223,7 +228,7 @@ curl -fs "http://127.0.0.1:$PORT/healthz" >/dev/null || die "the server did not 
 su -s /bin/bash "$SVC_USER" -c "set -a; . $ENV_FILE; set +a; $VENV/bin/gatemoe doctor" || true
 
 # ------------------------------------------------------------------ done
-PUB_IP="$(imds public-ipv4)"
+PUB_IP="$(cloud_meta ip)"
 [[ "$PUB_IP" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || PUB_IP="<this-server-ip>"
 PASS="$(sed -n "s/^GATEMOE_PASSWORD='\(.*\)'$/\1/p" "$ENV_FILE")"
 cat <<EOF
@@ -235,9 +240,10 @@ cat <<EOF
  Login:     user "gatemoe", password "$PASS"
             (change it: sudo nano $ENV_FILE && sudo systemctl restart gatemoe)
 
- AWS: allow inbound TCP $PORT in the instance's security group - source "My IP" only.
- Safer (no open port, encrypted):  ssh -L $PORT:localhost:$PORT ubuntu@$PUB_IP
-                                   then open http://localhost:$PORT
+ Open the port for your own IP only - AWS: security group inbound rule;
+   Google Cloud: gcloud compute firewall-rules create gatemoe --allow=tcp:$PORT --source-ranges=<your-ip>/32
+ Safer (no open port, encrypted):  ssh -L $PORT:localhost:$PORT <user>@$PUB_IP
+   (Google Cloud: gcloud compute ssh <vm> -- -L $PORT:localhost:$PORT), then open http://localhost:$PORT
 
  Logs:      journalctl -u gatemoe -f        Settings: $CONF
  A lesson takes several minutes on CPU. Stop the instance when you are not using it.
