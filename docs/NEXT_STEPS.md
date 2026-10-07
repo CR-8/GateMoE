@@ -1,0 +1,84 @@
+# Next steps / handover
+
+This file is the running plan for continuing GateMoE in a fresh session (another machine or
+account). It is updated with every commit that changes the plan. Read it with
+[ARCHITECTURE.md](ARCHITECTURE.md) and [RESEARCH_FINDINGS.md](RESEARCH_FINDINGS.md).
+
+## State (7 Oct 2026)
+
+Working end to end on x86 with the real models (Clef-flash router, Qwen3.5-4B generator):
+router -> plan -> Kiwix retrieval -> notes / flashcards / quiz / code / podcast script / video plan
+-> Supertonic or MMS speech -> Manim or HyperFrames video -> Typst handout, plus Graphviz concept
+maps and PhET simulations served from ZIM files. Web UI (phone-friendly) and CLI. 44 model-free tests.
+
+Measured on a 2-thread x86 container (not a Pi): English lesson ~19 min, Kannada ~26 min; the router
+call is ~60 s (930 prompt tokens, no prefix cache possible); the generator runs at ~3.5 tok/s, so text
+generation (notes 390 s, podcast 282 s, video plan 267 s) dominates.
+
+## Set up a development session
+
+```bash
+git clone https://github.com/CR-8/GateMoE.git && cd GateMoE
+python3 -m venv .venv && . .venv/bin/activate && pip install -e ".[dev]"
+pytest                                   # no models needed (fake llama-server)
+sudo apt-get install -y graphviz ffmpeg fonts-noto-core   # concept maps, audio/video, fonts
+```
+
+For real-model runs: build llama.cpp (master, with Clef support), then
+`DATA_DIR=... ./scripts/download_models.sh` (or only the GGUFs + a few ZIMs, e.g.
+`ZIMS="wikipedia_en_physics_nopic phet_en_all" SKIP_SPEECH=1`), write a small config like:
+
+```yaml
+paths: {data_dir: /path/to/data, llama_server: /path/to/llama.cpp/build/bin/llama-server}
+llama: {extra_args: ["-nr"], ready_timeout_s: 3600}   # -nr only on x86 with AMX, never on the Pi
+hardware: {threads: 4}
+```
+
+and run `GATEMOE_CONFIG=that.yaml gatemoe lesson "Explain Ohm's law with a quiz" --language en`.
+
+## Open work, in priority order
+
+### A. Review findings still to fix (from the adversarial review, run 1)
+
+Reproduced by the reviewers unless marked. Fixed items are moved to the git log.
+
+1. llama-server orphaned on Ctrl+C / SIGTERM during `serve` or while a model loads; `/health` then
+   accepts the orphan as "ready" (two models resident -> OOM on the Pi). Fix: kill on BaseException in
+   `LlamaServer.start`, lifespan/atexit unload, refuse to start if the port already answers,
+   check `proc.poll()` after health.
+2. Knowledge: the global article cap is applied before the per-language quota, so English hits crowd
+   out learner-language articles (seen in the Kannada run: only English passages). Fix: per-language
+   article budget.
+3. Router failure kills the lesson; should degrade to `router.min_gateways`.
+4. Job worker thread dies on an OSError outside the try; cancelling a queued job never closes its
+   event log (SSE hangs); cancel/worker race.
+5. `detect_language` ignores languages from `--config`.
+6. Cancel is not honoured inside long LLM calls / TTS (needs an abortable HTTP call + kill).
+7. Unbounded `gateways` list / no queue limit on the API; whitespace-only request -> 500.
+8. Media: HyperFrames hold starts before the animation finishes on short narration; `narrate()` is
+   all-or-nothing; an unreachable preferred TTS plugin has no fallback to built-in voices.
+9. Smaller: non-atomic lesson.json write, redirect-unaware article de-dup, Anki TSV HTML escaping,
+   llama-server log growth, `pid` TOCTOU, Portuguese misdetected as English, plugin `prefer` default.
+
+### B. Optimisation work (deep, measured)
+
+1. **Generator speed (largest lever).** Try llama.cpp speculative decoding with a small draft model
+   from the same family (`--model-draft`, `--draft-max/min`) and draftless n-gram/lookup decoding;
+   JSON outputs repeat keys and source phrases, so acceptance should be high. Measure tok/s and
+   end-to-end gateway time on the same prompts; check the extra RAM on the 8 GB Pi.
+2. **Grammar cost.** Measure tokens/s with and without `json_schema` on the same prompts (grammar
+   sampling is single-threaded on CPU); simplify schemas if it matters.
+3. **Router prompt size vs quality.** The schema is 92 % of Clef's prompt and cannot be cached.
+   Build a small labelled request set (EN + Indic), then ablate question wording/count and quantisation
+   (Q4_0 / IQ4_NL / Q3_K) for latency vs decision F1.
+4. **Retrieval quality.** Per-language quota fix (A2), then a small relevance check on the Kannada set.
+5. **CPU overlap.** TTS and Manim are CPU-bound; measure whether starting podcast TTS while the
+   generator writes the video plan helps or hurts on 4 cores.
+6. **Pi validation.** Everything above is measured on x86 so far; repeat the key numbers on a Pi 5.
+
+### C. Research write-up
+
+`scripts/analyze_jobs.py` already produces theoretical vs realised savings; run `--mode all` vs
+`--mode clef` on the same request set and fill the tables in [EXPERIMENTS.md](EXPERIMENTS.md).
+Known router behaviour to report: Clef-flash missed an explicitly requested quiz in a Kannada
+request that also asked for a video (P(quiz) = 0.30).

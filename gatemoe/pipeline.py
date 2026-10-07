@@ -16,10 +16,13 @@ import time
 from pathlib import Path
 
 from .config import Config
+from .gateways.conceptmap import ConceptMapGateway
+from .gateways.handout import HandoutGateway
 from .gateways.speech import SpeechGateway
 from .gateways.text import TextGateway
 from .gateways.video import VideoGateway
 from .knowledge import KnowledgeBase
+from .knowledge.phet import SimulationFinder
 from .langid import detect_language
 from .llm.client import Generator
 from .registry import specialists
@@ -39,6 +42,9 @@ class LessonPipeline:
         self.kb = KnowledgeBase(cfg)
         self.speech = SpeechGateway(cfg)
         self.video = VideoGateway(cfg)
+        self.handout = HandoutGateway(cfg)
+        self.concept_map = ConceptMapGateway(cfg)
+        self.sims = SimulationFinder(cfg, self.kb)
 
     def _pick_engine(self, wanted: str) -> str | None:
         engines = self.video.available_engines()
@@ -86,6 +92,14 @@ class LessonPipeline:
         lesson["route"] = decision.to_dict()
         if decision.mode == "clef":
             activated.append("router:clef-flash")
+        in_min = float(cfg.get("router.in_scope_min", 0) or 0)
+        if decision.mode == "clef" and decision.in_scope is not None and decision.in_scope < in_min:
+            # conditional computation at its cheapest: no generator, TTS or video is loaded at all
+            lesson["out_of_scope"] = True
+            lesson["errors"]["scope"] = (f"This does not look like a request to learn a technical or scientific topic "
+                                         f"(router P(in scope) = {decision.in_scope:.2f}). Rephrase it, or pick the "
+                                         f"gateways manually.")
+            return
         selected = [g for g in TEXT_ORDER if g in decision.selected]
         engine = self._pick_engine(decision.video_engine) if "video" in selected else None
         if "video" in selected and engine is None:
@@ -99,25 +113,56 @@ class LessonPipeline:
         gen = Generator(server.base_url, timeout=float(cfg["models.generator.request_timeout_s"]),
                         temperature=float(cfg["models.generator.temperature"]),
                         disable_thinking=bool(cfg["models.generator.disable_thinking"]), events=ev)
-        tg = TextGateway(cfg, gen, code, decision, request)
-        with ev.stage("plan"):
-            plan = tg.plan()
+        tts_engine = self.speech.engine_for(code)
+        tg = TextGateway(cfg, gen, code, decision, request, tts_engine=tts_engine)
+        try:
+            with ev.stage("plan"):
+                plan = tg.plan()
+        except Cancelled:
+            raise
+        except Exception as exc:
+            lesson["errors"]["plan"] = f"{type(exc).__name__}: {exc}"
+            plan = {"title": request[:100], "search_queries_en": [], "search_queries_native": [request[:80]],
+                    "key_terms": [], "outline": []}
         lesson["plan"] = plan
 
         passages: list[dict] = []
         if cfg["knowledge.enabled"]:
-            with ev.stage("retrieve") as st:
-                queries = [(q, "en") for q in plan.get("search_queries_en", [])]
-                queries += [(q, code) for q in plan.get("search_queries_native", [])]
-                if not queries:
-                    queries = [(request, code)]
-                passages = self.kb.search(queries, learner_lang=code, subject=decision.subject, events=ev)
-                st.update(passages=len(passages), zims=sorted({p.get("zim", "") for p in passages}))
+            try:
+                with ev.stage("retrieve") as st:
+                    queries = [(q, "en") for q in plan.get("search_queries_en", [])]
+                    queries += [(q, code) for q in plan.get("search_queries_native", [])]
+                    if not queries:
+                        queries = [(request, code)]
+                    passages = self.kb.search(queries, learner_lang=code, subject=decision.subject, events=ev)
+                    st.update(passages=len(passages), zims=sorted({p.get("zim", "") for p in passages}))
+            except Cancelled:
+                raise
+            except Exception as exc:
+                lesson["errors"]["retrieve"] = f"{type(exc).__name__}: {exc}"
             for z in sorted({p.get("zim", "") for p in passages if p.get("zim")}):
                 activated.append("knowledge:" + z)
-        lesson["sources"] = [{k: p.get(k) for k in ("title", "zim", "path", "lang", "score")} | {"excerpt": (p.get("text") or "")[:400]}
-                             for p in passages]
+        lesson["sources"] = [{**{k: p.get(k) for k in ("title", "zim", "path", "lang", "score")},
+                              "excerpt": (p.get("text") or "")[:400]} for p in passages]
         tg.set_sources(passages)
+
+        # interactive simulations (PhET ZIMs): deterministic title matching, no model time
+        if self.sims.available():
+            try:
+                with ev.stage("simulations") as st:
+                    sim_q = [(q, "en") for q in plan.get("search_queries_en", [])]
+                    sim_q += [(q, code) for q in plan.get("search_queries_native", []) + plan.get("key_terms", [])]
+                    sim_q += [(plan.get("title", ""), code), (request, code)]
+                    sims = self.sims.find(sim_q, code, decision.subject)
+                    st.update(found=[s["id"] for s in sims])
+                if sims:
+                    lesson["simulations"] = sims
+                    for z in sorted({s["zim"] for s in sims}):
+                        activated.append("simulations:" + z)
+            except Cancelled:
+                raise
+            except Exception as exc:
+                lesson["errors"]["simulations"] = f"{type(exc).__name__}: {exc}"
 
         for task in selected:
             ev.check_cancel()
@@ -129,31 +174,58 @@ class LessonPipeline:
             except Exception as exc:  # one failed gateway must not sink the lesson
                 lesson["errors"][task] = f"{type(exc).__name__}: {exc}"
 
+        # 3b. check the video plan against the chosen renderer while the generator can still fix it
+        if "video" in lesson and engine:
+            try:
+                with ev.stage("check_video") as st:
+                    bad = self.video.validate(lesson["video"], code, engine)
+                    fixed = 0
+                    for i, err in list(bad.items())[: int(cfg.get("video.max_repairs", 3))]:
+                        ev.check_cancel()
+                        try:
+                            beat = tg.repair_beat(lesson["video"]["beats"][i], err, engine)
+                        except Cancelled:
+                            raise
+                        except Exception:
+                            continue
+                        lesson["video"]["beats"][i] = beat
+                        fixed += 1
+                    st.update(invalid=len(bad), repaired=fixed)
+            except Cancelled:
+                raise
+            except Exception as exc:  # validation is an optimisation; rendering still falls back per beat
+                lesson["errors"]["check_video"] = f"{type(exc).__name__}: {exc}"
+
         # 4. free RAM before audio/video work --------------------------------------------------
         with ev.stage("unload_generator"):
             self.models.unload(ev)
 
         # 5. speech ----------------------------------------------------------------------------
-        tts_engine = self.speech.engine_for(code)
         narration = None
-        try:
-            if "podcast" in lesson and tts_engine:
-                with ev.stage("tts_podcast"):
-                    lesson["podcast_audio"] = self.speech.podcast(lesson["podcast"]["turns"], code, out_dir, ev)
-                activated.append("tts:" + tts_engine)
-            if "video" in lesson and tts_engine:
-                with ev.stage("tts_narration"):
-                    narration = self.speech.narrate([b["narration"] for b in lesson["video"]["beats"]],
-                                                    code, out_dir / "narration", ev)
-                activated.append("tts:" + tts_engine)
-        except Cancelled:
-            raise
-        except Exception as exc:
-            lesson["errors"]["speech"] = f"{type(exc).__name__}: {exc}"
-        finally:
-            self.speech.close()
         if ("podcast" in lesson or "video" in lesson) and not tts_engine:
             lesson["errors"]["speech"] = f"no offline TTS voice installed for '{code}' (text and captions only)"
+        try:
+            if "podcast" in lesson and tts_engine:
+                try:
+                    with ev.stage("tts_podcast"):
+                        lesson["podcast_audio"] = self.speech.podcast(lesson["podcast"]["turns"], code, out_dir, ev)
+                    activated.append("tts:" + tts_engine)
+                except Cancelled:
+                    raise
+                except Exception as exc:
+                    lesson["errors"]["tts_podcast"] = f"{type(exc).__name__}: {exc}"
+            if "video" in lesson and tts_engine:
+                try:
+                    with ev.stage("tts_narration"):
+                        narration = self.speech.narrate([b["narration"] for b in lesson["video"]["beats"]],
+                                                        code, out_dir / "narration", ev)
+                    activated.append("tts:" + tts_engine)
+                except Cancelled:
+                    raise
+                except Exception as exc:  # the video still renders, silently, with subtitles
+                    lesson["errors"]["tts_narration"] = f"{type(exc).__name__}: {exc}"
+        finally:
+            self.speech.close()
 
         # 6. video -----------------------------------------------------------------------------
         if "video" in lesson and engine:
@@ -169,9 +241,25 @@ class LessonPipeline:
             except Exception as exc:
                 lesson["errors"]["video_render"] = f"{type(exc).__name__}: {exc}"
 
-        # 7. exports ---------------------------------------------------------------------------
+        # 7. concept map (Graphviz), exports and a printable Typst handout (no LLM time) ---------
+        cmap = (lesson.get("notes") or {}).get("concept_map")
+        if cmap and self.concept_map.available():
+            try:
+                with ev.stage("concept_map") as st:
+                    lesson["concept_map"] = self.concept_map.render(cmap, code, out_dir)
+                    st.update(nodes=lesson["concept_map"]["nodes"], edges=lesson["concept_map"]["edges"])
+                activated.append("concept_map:graphviz")
+            except Exception as exc:
+                lesson["errors"]["concept_map"] = f"{type(exc).__name__}: {exc}"
         with ev.stage("package"):
             write_exports(lesson, out_dir)
+        if any(k in lesson for k in ("notes", "quiz", "flashcards")) and self.handout.available():
+            try:
+                with ev.stage("handout"):
+                    lesson["handout"] = self.handout.render(lesson, code, out_dir)
+                activated.append("handout:typst")
+            except Exception as exc:
+                lesson["errors"]["handout"] = f"{type(exc).__name__}: {exc}"
 
 
 def write_exports(lesson: dict, out_dir: Path) -> None:
@@ -184,7 +272,12 @@ def write_exports(lesson: dict, out_dir: Path) -> None:
         if notes.get("key_points"):
             md += ["## Key points", ""] + [f"- {k}" for k in notes["key_points"]] + [""]
         if notes.get("glossary"):
-            md += ["## Glossary", ""] + [f"- **{g['term']}**: {g['definition']}" for g in notes["glossary"]]
+            md += ["## Glossary", ""] + [f"- **{g['term']}**: {g['definition']}" for g in notes["glossary"]] + [""]
+        if (lesson.get("concept_map") or {}).get("svg"):
+            md += ["## Concept map", "", f"![Concept map]({lesson['concept_map']['svg']})", ""]
+        if lesson.get("simulations"):
+            md += ["## Interactive simulations (PhET, offline)", ""] + [
+                f"- {s['title']} ({s['zim']}/{s['path']})" for s in lesson["simulations"]]
         (out_dir / "notes.md").write_text("\n".join(md), encoding="utf-8")
     cards = (lesson.get("flashcards") or {}).get("cards")
     if cards:

@@ -14,7 +14,7 @@ VIDEO_TEMPLATES: dict[str, dict] = {
     "function_graph":   {"engines": ["manim"], "slots": "title, expression (in x, e.g. x**2 - 1), x_min, x_max, lines[0] = caption"},
     "array_steps":      {"engines": ["manim"], "slots": "title, values (sorted integers, 5-12), target (integer) - animates binary search"},
     "process_steps":    {"engines": ["hyperframes"], "slots": "title, lines (3-6 steps in order)"},
-    "bar_chart":        {"engines": ["hyperframes"], "slots": "title, labels (2-8), values (same count, numbers)"},
+    "bar_chart":        {"engines": ["hyperframes"], "slots": "title, labels (2-8 short category names, e.g. \"10 V\"), values (exactly one plain number per label), lines[0] = caption"},
     "code_walkthrough": {"engines": ["hyperframes"], "slots": "title, code (<= 14 lines), highlight (1-based line numbers)"},
     "definition":       {"engines": ["hyperframes"], "slots": "title = term, lines[0] = definition, lines[1:] = examples"},
 }
@@ -39,39 +39,41 @@ def _obj(props: dict, required: list[str] | None = None) -> dict:
 
 def plan_schema() -> dict:
     return _obj({
-        "title": _str(120),
-        "search_queries_en": _arr(_str(80), 1, 3),
-        "search_queries_native": _arr(_str(80), 0, 3),
-        "key_terms": _arr(_str(60), 3, 8),
-        "outline": _arr(_str(140), 3, 6),
+        "title": _str(100),
+        "search_queries_en": _arr(_str(60), 1, 3),
+        "search_queries_native": _arr(_str(60), 0, 2),
+        "key_terms": _arr(_str(40), 2, 6),
     })
 
 
-def notes_schema() -> dict:
-    return _obj({
+def notes_schema(concept_map: bool = True) -> dict:
+    props = {
         "title": _str(120),
-        "sections": _arr(_obj({"heading": _str(100), "body": _str(1200, 20)}), 3, 6),
-        "key_points": _arr(_str(200), 3, 6),
-        "glossary": _arr(_obj({"term": _str(60), "definition": _str(240)}), 2, 8),
-    })
+        "sections": _arr(_obj({"heading": _str(100), "body": _str(700, 20)}), 3, 4),
+        "key_points": _arr(_str(160), 3, 6),
+        "glossary": _arr(_obj({"term": _str(60), "definition": _str(200)}), 2, 6),
+    }
+    if concept_map:   # rendered by Graphviz (gateways/conceptmap.py); the model writes only triples
+        props["concept_map"] = _arr(_obj({"from": _str(40), "label": _str(30, 0), "to": _str(40)}), 4, 10)
+    return _obj(props)
 
 
 def flashcards_schema(n: int) -> dict:
-    return _obj({"cards": _arr(_obj({"front": _str(200), "back": _str(320)}), n, n)})
+    return _obj({"cards": _arr(_obj({"front": _str(100), "back": _str(180)}), n, n)})
 
 
 def quiz_schema(n: int) -> dict:
     q = _obj({
-        "question": _str(300),
-        "options": _arr(_str(160), 4, 4),
+        "question": _str(240),
+        "options": _arr(_str(120), 4, 4),
         "answer_index": {"type": "integer", "minimum": 0, "maximum": 3},
-        "explanation": _str(400),
+        "explanation": _str(300),
     })
     return _obj({"questions": _arr(q, n, n)})
 
 
 def podcast_schema(n: int) -> dict:
-    turn = _obj({"speaker": {"type": "string", "enum": ["A", "B"]}, "text": _str(420)})
+    turn = _obj({"speaker": {"type": "string", "enum": ["A", "B"]}, "text": _str(300)})
     return _obj({"title": _str(120), "turns": _arr(turn, max(4, n - 2), n + 2)})
 
 
@@ -89,7 +91,7 @@ def video_schema(engine: str, max_beats: int) -> dict:
     beat = _obj({
         "template": {"type": "string", "enum": templates_for(engine)},
         "title": _str(90),
-        "narration": _str(420),
+        "narration": _str(300),
         "lines": _arr(_str(140), 0, 6),
         "equations": _arr(_str(120), 0, 4),
         "expression": _str(80, 0),

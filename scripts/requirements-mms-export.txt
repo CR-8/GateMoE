@@ -1,0 +1,5 @@
+# One-time MMS -> ONNX export venv (delete afterwards). On x86 use: pip install torch --index-url https://download.pytorch.org/whl/cpu
+torch==2.14.1            # aarch64 PyPI wheel is CPU-only (454 MB)
+transformers==5.18.0
+onnx==1.23.2
+onnxruntime==1.30.0

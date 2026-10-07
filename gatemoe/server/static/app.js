@@ -190,13 +190,15 @@ function renderLesson(lesson) {
     renderStages();
   }
   const tabs = [];
-  if (lesson.notes) tabs.push(["Notes", () => notesView(lesson.notes)]);
+  if (lesson.notes) tabs.push(["Notes", () => notesView(lesson.notes, lesson.concept_map)]);
   if (lesson.flashcards) tabs.push(["Flashcards", () => cardsView(lesson.flashcards.cards || [])]);
   if (lesson.quiz) tabs.push(["Quiz", () => quizView(lesson.quiz.questions || [])]);
   if (lesson.podcast) tabs.push(["Podcast", () => podcastView(lesson.podcast, lesson.podcast_audio)]);
   if (lesson.video) tabs.push(["Video", () => videoView(lesson.video, lesson.video_render)]);
   if (lesson.code) tabs.push(["Code", () => codeView(lesson.code)]);
+  if ((lesson.simulations || []).length) tabs.push(["Simulations", () => simsView(lesson.simulations)]);
   if (lesson.sources) tabs.push(["Sources", () => sourcesView(lesson.sources)]);
+  tabs.push(["Downloads", () => downloadsView(lesson)]);
   if (lesson.errors && Object.keys(lesson.errors).length) tabs.push(["Issues", () => issuesView(lesson.errors)]);
   const nav = $("#tabs"); nav.replaceChildren();
   const show = (i) => {
@@ -225,11 +227,15 @@ function mdBlock(body) {
   return wrap;
 }
 const fileUrl = (name) => `/api/lessons/${CURRENT}/files/${encodeURIComponent(name).replace(/%2F/g, "/")}`;
+const zimUrl = (zim, path) => `/zim/${encodeURIComponent(zim)}/${String(path).split("/").map(encodeURIComponent).join("/")}`;
 
-function notesView(n) {
+function notesView(n, cmap) {
   const d = el("div", { class: "notes" }, el("h3", { text: n.title || "" }));
   for (const s of n.sections || []) d.append(el("h4", { text: s.heading }), mdBlock(s.body));
   if ((n.key_points || []).length) d.append(el("h4", { text: "Key points" }), el("ul", {}, n.key_points.map((k) => el("li", {}, inline(k)))));
+  if (cmap && cmap.svg) d.append(el("h4", { text: "Concept map" }),
+    el("a", { href: fileUrl(cmap.svg), target: "_blank", rel: "noopener" },
+      el("img", { class: "cmap", src: fileUrl(cmap.svg), alt: "Concept map of the lesson", loading: "lazy" })));
   if ((n.glossary || []).length) {
     const dl = el("dl", { class: "kv" }); n.glossary.forEach((g) => dl.append(el("dt", { text: g.term }), el("dd", { text: g.definition })));
     d.append(el("h4", { text: "Glossary" }), dl);
@@ -287,7 +293,39 @@ function codeView(c) {
 }
 function sourcesView(src) {
   if (!src.length) return el("p", { class: "muted", text: "No offline sources were found; content relies on the model's own knowledge." });
-  return el("div", {}, src.map((s, i) => el("div", { class: "src" }, el("b", { text: `[${i + 1}] ${s.title || ""}` }), ` · ${s.zim || ""}`, el("p", { class: "muted", text: s.excerpt || "" }))));
+  return el("div", {}, src.map((s, i) => el("div", { class: "src" }, el("b", { text: `[${i + 1}] ${s.title || ""}` }), ` · ${s.zim || ""} · `,
+    s.zim && s.path ? el("a", { href: zimUrl(s.zim, s.path), target: "_blank", rel: "noopener", text: "read offline ↗" }) : null,
+    el("p", { class: "muted", text: s.excerpt || "" }))));
+}
+function simsView(sims) {
+  const stage = el("div", { class: "simstage" });
+  const box = el("div", {}, el("p", { class: "muted", text: "Interactive simulations from the offline PhET library. They run in a sandbox on this device - no internet needed." }));
+  for (const s of sims) {
+    const url = zimUrl(s.zim, s.path);
+    const open = () => {
+      stage.replaceChildren(el("iframe", { src: url, sandbox: "allow-scripts", allow: "fullscreen", title: s.title }));
+      stage.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    };
+    box.append(el("div", { class: "sim" },
+      s.thumbnail ? el("img", { src: zimUrl(s.zim, s.thumbnail), alt: "", loading: "lazy" }) : el("div"),
+      el("div", {}, el("b", { text: s.title }), el("p", { class: "muted", text: `${s.zim} · ${(s.categories || []).join(", ")}` }),
+        el("div", { class: "row" }, el("button", { type: "button", text: "Open here", onclick: open }),
+          el("a", { href: url, target: "_blank", rel: "noopener", text: "Full screen ↗" })))));
+  }
+  box.append(stage, el("p", { class: "muted", text: "PhET Interactive Simulations, University of Colorado Boulder (phet.colorado.edu), CC BY 4.0." }));
+  return box;
+}
+function downloadsView(l) {
+  const items = [];
+  if (l.handout) items.push(["handout.pdf", "Printable handout (PDF): notes, flashcards, quiz + answer key"]);
+  if (l.notes) items.push(["notes.md", "Notes (Markdown)"]);
+  if (l.concept_map) { items.push([l.concept_map.svg, "Concept map (SVG)"]); if (l.concept_map.png) items.push([l.concept_map.png, "Concept map (PNG)"]); }
+  if (l.flashcards) items.push(["flashcards_anki.tsv", "Flashcards for Anki (TSV)"]);
+  if (l.podcast_audio) items.push([l.podcast_audio.audio, "Podcast audio"]);
+  if (l.video_render) items.push([l.video_render.video, "Video (MP4)"], [l.video_render.srt, "Subtitles (SRT)"]);
+  if (l.code) items.push(["example.py", "Python example"]);
+  items.push(["lesson.json", "Everything as JSON (incl. routing + metrics)"]);
+  return el("ul", {}, items.map(([f, label]) => el("li", {}, el("a", { href: fileUrl(f), download: f, text: label }))));
 }
 function issuesView(errs) {
   return el("div", {}, Object.entries(errs).map(([k, v]) => el("p", {}, el("b", { text: `${k}: ` }), el("span", { class: "err", text: v }))));

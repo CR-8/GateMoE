@@ -1,0 +1,158 @@
+<!doctype html>
+<!-- GateMoE template: code walkthrough with highlighted line ranges (max 22 lines shown, tabs -> 4 spaces).
+     Code is tokenised client-side and every token is inserted with textContent, so "<", "&", "</script>"
+     in code are shown literally. Default timing: intro + all highlight moves finish <= 3.0 s, then holds.
+     payload = {"heading":str, "language":"python"|"javascript"|"c"|"cpp"|"java"|"bash"|"text", "code":str,
+                "highlights":[{"lines":[from,to], "note":str?, "at":seconds?}], "footer":str?, "lang":"en", "dir":"ltr"} -->
+<html lang="en" data-composition-variables='[{"id":"payload","type":"string","label":"Scene payload (JSON)","default":"{\"heading\":\"Code\",\"language\":\"python\",\"code\":\"def add(a, b):\\n    return a + b\\n\\nprint(add(2, 3))\",\"highlights\":[{\"lines\":[1,2],\"note\":\"Define a function\"}]}"}]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1280, height=720" />
+    <link rel="stylesheet" href="assets/base.css" />
+    <script src="assets/gsap.min.js"></script>
+    <script src="assets/gm.js"></script>
+    <style>
+      #stage { display: flex; flex-direction: column; padding: 40px 64px 64px; gap: 18px; }
+      #top { display: flex; align-items: baseline; gap: 18px; }
+      #heading { font-size: 38px; font-weight: 700; line-height: 1.3; flex: 1; min-width: 0; }
+      #langtag { font-family: var(--gm-mono); font-size: 18px; color: #0f172a; background: var(--gm-accent2);
+                 padding: 4px 12px; border-radius: 6px; font-weight: 700; }
+      #editor { position: relative; flex: 1; min-height: 0; background: #0b1220; border: 1px solid #1f2a44;
+                border-radius: 14px; overflow: hidden; }
+      #code { position: absolute; left: 0; right: 0; top: 18px; font-family: var(--gm-mono); white-space: pre; }
+      .line { display: flex; }
+      .ln { flex: 0 0 3.2em; text-align: right; padding-right: 1.1em; color: #8b9bb4; user-select: none; }
+      .src { flex: 1; min-width: 0; overflow: hidden; color: #e2e8f0; }
+      #hl { position: absolute; left: 0; right: 0; top: 18px; background: rgba(56,189,248,0.16);
+            border-left: 5px solid var(--gm-accent); opacity: 0; }
+      .note { position: absolute; right: 22px; bottom: 18px; max-width: 62%; background: var(--gm-accent2); color: #111827;
+              font-size: 24px; font-weight: 700; line-height: 1.35; padding: 12px 18px; border-radius: 10px; opacity: 0;
+              overflow-wrap: anywhere; }
+      .k { color: #c084fc; } .s { color: #86efac; } .c { color: #8b9bb4; font-style: italic; }
+      .n { color: #fbbf24; } .f { color: #7dd3fc; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="4" data-width="1280" data-height="720">
+      <div id="stage" class="clip">
+        <div id="top"><div id="heading"></div><div id="langtag"></div></div>
+        <div id="editor"><div id="hl"></div><div id="code"></div></div>
+      </div>
+      <div id="footer" class="gm-footer"></div>
+    </div>
+    <script>
+      (function () {
+        var p = GM.payload();
+        GM.setLang(p);
+        document.getElementById("editor").dir = "ltr"; // code is always LTR
+        var language = String(p.language || "text").toLowerCase();
+        GM.text(document.getElementById("heading"), p.heading);
+        GM.text(document.getElementById("langtag"), language);
+        GM.text(document.getElementById("footer"), p.footer);
+        var MAXL = 22;
+        var lines = String(p.code || "").replace(/\r\n?/g, "\n").replace(/\t/g, "    ").split("\n").slice(0, MAXL);
+        while (lines.length > 1 && lines[lines.length - 1].trim() === "") lines.pop();
+
+        var KW = {
+          python: "False None True and as assert async await break class continue def del elif else except finally for from global if import in is lambda nonlocal not or pass raise return try while with yield print self",
+          javascript: "async await break case catch class const continue default delete do else export extends false finally for function if import in instanceof let new null of return static super switch this throw true try typeof undefined var void while yield",
+          c: "auto break case char const continue default do double else enum extern float for goto if int long register return short signed sizeof static struct switch typedef union unsigned void volatile while include define NULL printf main",
+          java: "abstract boolean break byte case catch char class continue default do double else enum extends final finally float for if implements import instanceof int interface long new null package private protected public return short static super switch this throw throws try void while true false String System",
+          bash: "if then else elif fi for while do done case esac function in echo export local return exit"
+        };
+        KW.cpp = KW.c + " bool class namespace new delete template typename using public private protected virtual true false std cout cin endl vector string auto nullptr";
+        KW.js = KW.javascript; KW.py = KW.python; KW.sh = KW.bash;
+        var kw = {}; (KW[language] || "").split(" ").forEach(function (w) { if (w) kw[w] = 1; });
+        var hashComment = /^(python|py|bash|sh)$/.test(language);
+        var slashComment = /^(javascript|js|c|cpp|java)$/.test(language);
+        // tokenizer: returns [[cls, text], ...]; single-line only (block comments handled per line)
+        function tokens(line, state) {
+          var out = [], i = 0, m;
+          if (state.inBlock) {
+            var e = line.indexOf("*/");
+            if (e < 0) return [["c", line]];
+            out.push(["c", line.slice(0, e + 2)]); i = e + 2; state.inBlock = false;
+          }
+          var re = /\s+|[A-Za-z_][A-Za-z0-9_]*|\d[\d_.]*(?:e[+-]?\d+)?|"(?:\\.|[^"\\])*"?|'(?:\\.|[^'\\])*'?|`(?:\\.|[^`\\])*`?|\/\/.*|\/\*|#.*|./gy;
+          re.lastIndex = i;
+          while (re.lastIndex < line.length && (m = re.exec(line))) {
+            var t = m[0], rest = line.slice(re.lastIndex);
+            if (hashComment && t[0] === "#") out.push(["c", t]);
+            else if (slashComment && t.slice(0, 2) === "//") out.push(["c", t]);
+            else if (slashComment && t === "/*") {
+              var e2 = rest.indexOf("*/");
+              if (e2 < 0) { out.push(["c", t + rest]); state.inBlock = true; break; }
+              out.push(["c", t + rest.slice(0, e2 + 2)]); re.lastIndex += e2 + 2;
+            }
+            else if (!hashComment && t[0] === "#") { out.push(["k", t[0]]); re.lastIndex -= t.length - 1; }
+            else if (/^["'`]/.test(t)) out.push(["s", t]);
+            else if (/^\d/.test(t)) out.push(["n", t]);
+            else if (kw[t]) out.push(["k", t]);
+            else if (/^[A-Za-z_]/.test(t) && /^\s*\(/.test(rest)) out.push(["f", t]);
+            else out.push(["", t]);
+          }
+          return out;
+        }
+        var codeEl = document.getElementById("code"), st = { inBlock: false };
+        lines.forEach(function (ln, i) {
+          var row = GM.el("div", "line");
+          row.appendChild(GM.el("span", "ln", String(i + 1)));
+          var src = GM.el("span", "src");
+          tokens(ln, st).forEach(function (tk) { src.appendChild(GM.el("span", tk[0], tk[1])); });
+          if (!ln) src.appendChild(document.createTextNode(" "));
+          row.appendChild(src);
+          codeEl.appendChild(row);
+        });
+        // font size: fit both line count and longest line (Noto Sans Mono advance ~0.6em)
+        var maxLen = Math.max.apply(null, lines.map(function (l) { return l.length; }).concat([10])) + 5;
+        // reserve a strip at the bottom of the editor for the note bubbles so they never cover code
+        var hasNotes = (Array.isArray(p.highlights) ? p.highlights : []).some(function (h) { return h && h.note; });
+        var noteStrip = hasNotes ? 84 : 0;
+        var editorH = 720 - 40 - 64 - 50 - 18 - noteStrip, editorW = 1280 - 128;
+        var fontPx = Math.max(12, Math.min(28, Math.floor((editorH - 36) / (lines.length * 1.5)), Math.floor(editorW / (maxLen * 0.61))));
+        var lineH = Math.round(fontPx * 1.5);
+        function applyFont() { codeEl.style.fontSize = fontPx + "px"; codeEl.style.lineHeight = lineH + "px"; }
+        applyFont();
+        GM.layout(function () {
+          GM.fit(document.getElementById("heading"), document.getElementById("heading"), 38, 24);
+          // shrink further if a (non-Latin) line still overflows
+          var srcs = codeEl.querySelectorAll(".src");
+          var over = function () { for (var i = 0; i < srcs.length; i++) if (srcs[i].scrollWidth > srcs[i].clientWidth + 1) return true;
+                                   return codeEl.offsetHeight + 18 + noteStrip > document.getElementById("editor").clientHeight; };
+          while (fontPx > 12 && over()) { fontPx -= 1; lineH = Math.round(fontPx * 1.5); applyFont(); }
+        }, [p.heading, p.footer, p.code].concat((p.highlights || []).map(function (h) { return h && h.note; })).join(" "));
+
+        var tl = gsap.timeline({ paused: true });
+        tl.fromTo("#top", { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.1);
+        tl.fromTo("#editor", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 0.25);
+        var rows = codeEl.querySelectorAll(".line");
+        tl.fromTo(rows, { opacity: 0 }, { opacity: 1, duration: 0.25, stagger: Math.min(0.05, 0.8 / Math.max(rows.length, 1)) }, 0.45);
+        var hls = (Array.isArray(p.highlights) ? p.highlights : []).filter(function (h) { return h && Array.isArray(h.lines) && h.lines.length; }).slice(0, 6);
+        var k = hls.length, t0 = 1.5, span = 1.2;
+        var hl = document.getElementById("hl"), editor = document.getElementById("editor"), prevNote = null;
+        hls.forEach(function (h, i) {
+          var a = Math.max(1, Math.min(lines.length, Math.floor(h.lines[0])));
+          var b = Math.max(a, Math.min(lines.length, Math.floor(h.lines[h.lines.length - 1])));
+          var at = (typeof h.at === "number" && isFinite(h.at)) ? h.at : t0 + (k > 1 ? i * span / (k - 1) : 0);
+          // function-based values are evaluated lazily at first render, i.e. AFTER GM.layout settled fontPx.
+          // No tl.call()/text swaps: every state is a seekable tween (renderers seek with events suppressed).
+          tl.to(hl, { opacity: 1, y: function () { return (a - 1) * lineH; }, height: function () { return (b - a + 1) * lineH; },
+                      duration: 0.35, ease: "power2.inOut" }, at);
+          tl.to(rows, { opacity: function (j) { return (j + 1 >= a && j + 1 <= b) ? 1 : 0.38; }, duration: 0.3 }, at);
+          if (prevNote) tl.to(prevNote, { opacity: 0, duration: 0.15 }, at);
+          prevNote = null;
+          if (h.note) {
+            var n = GM.el("div", "note", h.note);
+            editor.appendChild(n);
+            tl.fromTo(n, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.25 }, at + 0.15);
+            prevNote = n;
+          }
+        });
+        tl.fromTo("#footer", { opacity: 0 }, { opacity: 1, duration: 0.5 }, 0.6);
+        window.__timelines = window.__timelines || {};
+        window.__timelines["main"] = tl;   // static registration (the linter looks for this literal)
+        window.__gmTimeline = tl;          // used by tools/fallback_render.mjs
+      })();
+    </script>
+  </body>
+</html>

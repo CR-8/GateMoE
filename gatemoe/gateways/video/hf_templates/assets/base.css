@@ -1,0 +1,52 @@
+/* GateMoE shared template styles. Offline: every font family used below is
+   declared here with a local url(), so the HyperFrames compiler never tries to
+   fetch it from Google Fonts (it only fetches families that have no @font-face). */
+@font-face { font-family: "GMSans"; src: url("fonts/NotoSans-Regular.ttf") format("truetype"); font-weight: 400; }
+@font-face { font-family: "GMSans"; src: url("fonts/NotoSans-Bold.ttf") format("truetype"); font-weight: 700; }
+@font-face { font-family: "GMDeva"; src: url("fonts/NotoSansDevanagari-Regular.ttf") format("truetype"); font-weight: 400; }
+@font-face { font-family: "GMDeva"; src: url("fonts/NotoSansDevanagari-Bold.ttf") format("truetype"); font-weight: 700; }
+@font-face { font-family: "GMKnda"; src: url("fonts/NotoSansKannada-Regular.ttf") format("truetype"); font-weight: 400; }
+@font-face { font-family: "GMKnda"; src: url("fonts/NotoSansKannada-Bold.ttf") format("truetype"); font-weight: 700; }
+@font-face { font-family: "GMTaml"; src: url("fonts/NotoSansTamil-Regular.ttf") format("truetype"); font-weight: 400; }
+@font-face { font-family: "GMTaml"; src: url("fonts/NotoSansTamil-Bold.ttf") format("truetype"); font-weight: 700; }
+@font-face { font-family: "GMTelu"; src: url("fonts/NotoSansTelugu-Regular.ttf") format("truetype"); font-weight: 400; }
+@font-face { font-family: "GMTelu"; src: url("fonts/NotoSansTelugu-Bold.ttf") format("truetype"); font-weight: 700; }
+@font-face { font-family: "GMBeng"; src: url("fonts/NotoSansBengali-Regular.ttf") format("truetype"); font-weight: 400; }
+@font-face { font-family: "GMBeng"; src: url("fonts/NotoSansBengali-Bold.ttf") format("truetype"); font-weight: 700; }
+@font-face { font-family: "GMGujr"; src: url("fonts/NotoSansGujarati-Regular.ttf") format("truetype"); font-weight: 400; }
+@font-face { font-family: "GMGujr"; src: url("fonts/NotoSansGujarati-Bold.ttf") format("truetype"); font-weight: 700; }
+@font-face { font-family: "GMGuru"; src: url("fonts/NotoSansGurmukhi-Regular.ttf") format("truetype"); font-weight: 400; }
+@font-face { font-family: "GMGuru"; src: url("fonts/NotoSansGurmukhi-Bold.ttf") format("truetype"); font-weight: 700; }
+@font-face { font-family: "GMMlym"; src: url("fonts/NotoSansMalayalam-Regular.ttf") format("truetype"); font-weight: 400; }
+@font-face { font-family: "GMMlym"; src: url("fonts/NotoSansMalayalam-Bold.ttf") format("truetype"); font-weight: 700; }
+@font-face { font-family: "GMOrya"; src: url("fonts/NotoSansOriya-Regular.ttf") format("truetype"); font-weight: 400; }
+@font-face { font-family: "GMOrya"; src: url("fonts/NotoSansOriya-Bold.ttf") format("truetype"); font-weight: 700; }
+@font-face { font-family: "GMArab"; src: url("fonts/NotoNaskhArabic-Regular.ttf") format("truetype"); font-weight: 400; }
+@font-face { font-family: "GMArab"; src: url("fonts/NotoNaskhArabic-Bold.ttf") format("truetype"); font-weight: 700; }
+@font-face { font-family: "GMMath"; src: url("fonts/NotoSansMath-Regular.ttf") format("truetype"); font-weight: 400; }
+@font-face { font-family: "GMMono"; src: url("fonts/NotoSansMono-Regular.ttf") format("truetype"); font-weight: 400; }
+@font-face { font-family: "GMMono"; src: url("fonts/NotoSansMono-Bold.ttf") format("truetype"); font-weight: 700; }
+
+:root {
+  --gm-font: "GMSans", "GMDeva", "GMKnda", "GMTaml", "GMTelu", "GMBeng", "GMGujr",
+             "GMGuru", "GMMlym", "GMOrya", "GMArab", "GMMath", sans-serif;
+  --gm-mono: "GMMono", "GMSans", "GMDeva", "GMKnda", "GMTaml", "GMTelu", monospace;
+  --gm-bg: #0f172a;
+  --gm-panel: #1e293b;
+  --gm-fg: #f1f5f9;
+  --gm-muted: #94a3b8;
+  --gm-accent: #38bdf8;
+  --gm-accent2: #f59e0b;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 1280px; height: 720px; overflow: hidden;
+  background: var(--gm-bg); color: var(--gm-fg);
+  font-family: var(--gm-font);
+}
+#root { position: relative; width: 1280px; height: 720px; overflow: hidden; }
+.clip { position: absolute; inset: 0; }
+.gm-heading { font-weight: 700; font-size: 52px; line-height: 1.25; color: var(--gm-fg); }
+.gm-sub { font-weight: 400; font-size: 30px; line-height: 1.4; color: var(--gm-muted); }
+.gm-bar { height: 6px; width: 120px; background: var(--gm-accent); border-radius: 3px; }
+.gm-footer { position: absolute; left: 64px; right: 64px; bottom: 28px; font-size: 18px; color: var(--gm-muted); }

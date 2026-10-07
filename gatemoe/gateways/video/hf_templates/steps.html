@@ -1,0 +1,100 @@
+<!doctype html>
+<!-- GateMoE template: timeline / process steps (2-6 steps). A connector line draws across,
+     nodes pop in, labels fade up. Animation ends <= 3.0 s then holds.
+     payload = {"heading":str, "steps":[{"label":str, "detail":str?, "tag":str?}], "footer":str?, "lang":"en", "dir":"ltr"|"rtl"}
+     "tag" is the text inside the node circle (default: step number; use a year for history timelines). -->
+<html lang="en" data-composition-variables='[{"id":"payload","type":"string","label":"Scene payload (JSON)","default":"{\"heading\":\"Process\",\"steps\":[{\"label\":\"Input\"},{\"label\":\"Process\"},{\"label\":\"Output\"}]}"}]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1280, height=720" />
+    <link rel="stylesheet" href="assets/base.css" />
+    <script src="assets/gsap.min.js"></script>
+    <script src="assets/gm.js"></script>
+    <style>
+      #stage { display: flex; flex-direction: column; padding: 64px 72px 80px; gap: 24px; }
+      #heading { font-size: 48px; font-weight: 700; line-height: 1.3; padding: 0 24px; }
+      #track { position: relative; flex: 1; min-height: 0; }
+      #line { position: absolute; top: 166px; height: 6px; border-radius: 3px; background: var(--gm-accent); }
+      #steps { position: absolute; inset: 0; display: flex; }
+      .step { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 0 12px; }
+      .node { margin-top: 120px; width: 98px; height: 98px; border-radius: 50%; background: var(--gm-panel);
+              border: 6px solid var(--gm-accent); display: flex; align-items: center; justify-content: center;
+              font-weight: 700; font-size: 30px; color: var(--gm-fg); flex: 0 0 auto; overflow: hidden; }
+      .lbl { margin-top: 26px; font-size: 30px; font-weight: 700; line-height: 1.3; overflow-wrap: normal; }
+      .det { margin-top: 10px; font-size: 22px; color: var(--gm-muted); line-height: 1.45; overflow-wrap: normal; }
+      .textbox { width: 100%; max-height: 280px; overflow: hidden; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="4" data-width="1280" data-height="720">
+      <div id="stage" class="clip">
+        <div id="heading"></div>
+        <div id="track"><div id="line"></div><div id="steps"></div></div>
+      </div>
+      <div id="footer" class="gm-footer"></div>
+    </div>
+    <script>
+      (function () {
+        var p = GM.payload();
+        GM.setLang(p);
+        var steps = (Array.isArray(p.steps) ? p.steps : []).slice(0, 6);
+        var n = Math.max(steps.length, 1);
+        GM.text(document.getElementById("heading"), p.heading);
+        GM.text(document.getElementById("footer"), p.footer);
+        var wrap = document.getElementById("steps");
+        var texts = [p.heading, p.footer];
+        steps.forEach(function (s, i) {
+          if (typeof s === "string") s = { label: s };
+          var col = GM.el("div", "step");
+          var node = GM.el("div", "node", (s.tag !== undefined && s.tag !== null && s.tag !== "") ? s.tag : String(i + 1));
+          if (String(node.textContent).length > 3) node.style.fontSize = "22px";
+          col.appendChild(node);
+          var box = GM.el("div", "textbox");
+          box.appendChild(GM.el("div", "lbl", s.label));
+          if (s.detail) box.appendChild(GM.el("div", "det", s.detail));
+          col.appendChild(box);
+          wrap.appendChild(col);
+          texts.push(s.label, s.detail, s.tag);
+        });
+        // connector spans from first node centre to last node centre
+        var colW = (1280 - 2 * 72) / n;
+        var line = document.getElementById("line");
+        line.style.left = (colW / 2) + "px";
+        line.style.width = Math.max(colW * (n - 1), 0) + "px";
+        if (n > 4) { document.querySelectorAll(".lbl").forEach(function (e) { e.style.fontSize = "26px"; });
+                     document.querySelectorAll(".det").forEach(function (e) { e.style.fontSize = "19px"; }); }
+        GM.layout(function () {
+          GM.fit(document.getElementById("heading"), document.getElementById("heading"), 48, 30);
+          // shrink label+detail until no word overflows the column (no mid-word breaks for Indic words);
+          // only if still overflowing at the minimum size, allow breaking anywhere as a last resort.
+          // (horizontal check is safe here: nothing INSIDE .textbox is transformed)
+          document.querySelectorAll(".textbox").forEach(function (b) {
+            var lbl = b.querySelector(".lbl"), det = b.querySelector(".det");
+            var px = parseFloat(getComputedStyle(lbl).fontSize);
+            var over = function () { return b.scrollHeight > b.clientHeight + 1 || b.scrollWidth > b.clientWidth + 1; };
+            while (px > 16 && over()) {
+              px -= 1; lbl.style.fontSize = px + "px"; if (det) det.style.fontSize = Math.round(px * 0.75) + "px";
+            }
+            if (over()) { lbl.style.overflowWrap = "anywhere"; if (det) det.style.overflowWrap = "anywhere"; }
+          });
+        }, texts.filter(Boolean).join(" "));
+
+        var rtl = p.dir === "rtl";
+        var tl = gsap.timeline({ paused: true });
+        tl.fromTo("#heading", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 0.1);
+        tl.fromTo("#line", { scaleX: 0, transformOrigin: rtl ? "100% 50%" : "0% 50%" },
+                  { scaleX: 1, duration: 1.8, ease: "none" }, 0.6);
+        var step = n > 1 ? 1.8 / (n - 1) : 0;
+        document.querySelectorAll("#steps .step").forEach(function (col, i) {
+          var t = 0.5 + i * step;
+          tl.fromTo(col.querySelector(".node"), { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.35, ease: "back.out(2)" }, t);
+          tl.fromTo(col.querySelector(".textbox"), { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, t + 0.15);
+        });
+        tl.fromTo("#footer", { opacity: 0 }, { opacity: 1, duration: 0.5 }, 0.6);
+        window.__timelines = window.__timelines || {};
+        window.__timelines["main"] = tl;   // static registration (the linter looks for this literal)
+        window.__gmTimeline = tl;          // used by tools/fallback_render.mjs
+      })();
+    </script>
+  </body>
+</html>

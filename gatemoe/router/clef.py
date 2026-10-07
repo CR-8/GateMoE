@@ -56,8 +56,11 @@ def build_questions(cfg: Config) -> dict:
     return q
 
 
-def build_state(text: str, lang_name: str) -> str:
-    return f"Learner request ({lang_name}): {text.strip()}"
+def build_state(text: str, lang_name: str, max_chars: int = 600) -> str:
+    text = " ".join(text.split())
+    if len(text) > max_chars:
+        text = text[:max_chars].rsplit(" ", 1)[0] + " …"
+    return f"Learner request ({lang_name}): {text}"
 
 
 def _choice(ans: dict) -> tuple[str, dict[str, float]]:
@@ -153,7 +156,7 @@ class ClefRouter:
                                  gateways={g: (1.0 if g in selected else 0.0) for g in GATEWAYS},
                                  note=f"router bypassed ({mode})")
         questions = build_questions(self.cfg)
-        state = build_state(text, lang_name)
+        state = build_state(text, lang_name, int(self.cfg.get("router.max_state_chars", 600)))
         key = self._key(state, questions)
         if self.cfg["router.memo_cache"]:
             hit = self._cache_get(key)

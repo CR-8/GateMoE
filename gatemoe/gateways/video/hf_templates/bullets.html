@@ -1,0 +1,69 @@
+<!doctype html>
+<!-- GateMoE template: bullet list reveal (1-6 bullets, staggered). Animation ends <= 3.0 s then holds.
+     payload = {"heading":str, "bullets":[str,...], "footer":str?, "lang":"en", "dir":"ltr"|"rtl"} -->
+<html lang="en" data-composition-variables='[{"id":"payload","type":"string","label":"Scene payload (JSON)","default":"{\"heading\":\"Key ideas\",\"bullets\":[\"First point\",\"Second point\",\"Third point\"]}"}]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1280, height=720" />
+    <link rel="stylesheet" href="assets/base.css" />
+    <script src="assets/gsap.min.js"></script>
+    <script src="assets/gm.js"></script>
+    <style>
+      #stage { display: flex; flex-direction: column; padding: 64px 96px 80px; gap: 30px; }
+      #heading { font-size: 50px; font-weight: 700; line-height: 1.3; }
+      #list { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 0.7em;
+              font-size: 34px; line-height: 1.45; overflow: hidden; }
+      .item { display: flex; align-items: flex-start; gap: 0.7em; }
+      .dot { flex: 0 0 auto; width: 1.4em; height: 1.4em; margin-top: 0.05em; border-radius: 50%;
+             background: var(--gm-accent); color: #0f172a; font-weight: 700; font-size: 0.7em;
+             display: flex; align-items: center; justify-content: center; line-height: 1; }
+      .txt { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="4" data-width="1280" data-height="720">
+      <div id="stage" class="clip">
+        <div id="heading"></div>
+        <div class="gm-bar" id="bar"></div>
+        <div id="list"></div>
+      </div>
+      <div id="footer" class="gm-footer"></div>
+    </div>
+    <script>
+      (function () {
+        var p = GM.payload();
+        GM.setLang(p);
+        var bullets = (Array.isArray(p.bullets) ? p.bullets : []).slice(0, 6);
+        GM.text(document.getElementById("heading"), p.heading);
+        GM.text(document.getElementById("footer"), p.footer);
+        var list = document.getElementById("list");
+        bullets.forEach(function (b, i) {
+          var row = GM.el("div", "item");
+          row.appendChild(GM.el("div", "dot", String(i + 1)));
+          row.appendChild(GM.el("div", "txt", b));
+          list.appendChild(row);
+        });
+        // fewer bullets -> bigger text; then shrink-to-fit after fonts load
+        var start = [40, 40, 40, 38, 34, 31, 29][bullets.length] || 30;
+        list.style.fontSize = start + "px";
+        GM.layout(function () {
+          GM.fit(document.getElementById("heading"), document.getElementById("heading"), 50, 32);
+          GM.fit(list, list, start, 18);
+        }, [p.heading, p.footer].concat(bullets).join(" "));
+
+        var tl = gsap.timeline({ paused: true });
+        tl.fromTo("#heading", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 0.1);
+        tl.fromTo("#bar", { scaleX: 0, transformOrigin: "0% 50%" }, { scaleX: 1, duration: 0.5, ease: "power2.inOut" }, 0.4);
+        // stagger so the last bullet finishes by 3.0 s whatever the count
+        var n = Math.max(bullets.length, 1), first = 0.7, dur = 0.5;
+        var step = Math.min(0.45, (3.0 - first - dur) / Math.max(n - 1, 1));
+        tl.fromTo("#list .item", { opacity: 0, x: (p.dir === "rtl" ? -40 : 40) },
+                  { opacity: 1, x: 0, duration: dur, ease: "power2.out", stagger: step }, first);
+        tl.fromTo("#footer", { opacity: 0 }, { opacity: 1, duration: 0.5 }, 0.6);
+        window.__timelines = window.__timelines || {};
+        window.__timelines["main"] = tl;   // static registration (the linter looks for this literal)
+        window.__gmTimeline = tl;          // used by tools/fallback_render.mjs
+      })();
+    </script>
+  </body>
+</html>
