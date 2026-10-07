@@ -70,6 +70,7 @@ class Generator:
                     predicted_n=timings.get("predicted_n", usage.get("completion_tokens")),
                     prompt_tps=round(timings.get("prompt_per_second", 0) or 0, 2),
                     gen_tps=round(timings.get("predicted_per_second", 0) or 0, 2),
+                    draft_n=timings.get("draft_n"), draft_accepted=timings.get("draft_n_accepted"),
                     finish=choice.get("finish_reason"))
             try:
                 obj = _extract_json(content)
