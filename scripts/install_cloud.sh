@@ -32,6 +32,7 @@ GSAP_VERSION="${GSAP_VERSION:-3.15.0}"
 PLAYWRIGHT_VERSION="${PLAYWRIGHT_VERSION:-1.56}"
 SVC_USER=gatemoe
 export DEBIAN_FRONTEND=noninteractive
+export HOME="${HOME:-/root}"      # cloud startup scripts may run without HOME (npm needs one)
 # re-runs: the checkouts belong to the service user, so root's git would refuse them ("dubious
 # ownership"); trust them for this script's git commands only
 export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0='*'

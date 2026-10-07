@@ -119,16 +119,23 @@ quota), try zones `us-central1-b` / `-f`, or `c4a-standard-4` (Google Axion, als
 gcloud config set project headlessui            # your project ID
 gcloud services enable compute.googleapis.com
 
-INSTALL='#!/bin/bash
-[ -f /etc/systemd/system/gatemoe.service ] || curl -fsSL https://raw.githubusercontent.com/CR-8/GateMoE/main/scripts/install_cloud.sh | GATEMOE_PASSWORD=pick-a-strong-one LANGS=kn bash > /var/log/gatemoe-install.log 2>&1'
+cat > gatemoe-startup.sh <<'EOF'
+#!/bin/bash
+export HOME=/root
+[ -f /etc/systemd/system/gatemoe.service ] && exit 0          # installed already
+curl -fsSL https://raw.githubusercontent.com/CR-8/GateMoE/main/scripts/install_cloud.sh \
+  | GATEMOE_PASSWORD='pick-a-strong-one' LANGS="kn" bash > /var/log/gatemoe-install.log 2>&1
+EOF
 
 gcloud compute instances create gatemoe-demo --zone=us-central1-a --machine-type=e2-standard-4 \
   --image-family=ubuntu-2404-lts-amd64 --image-project=ubuntu-os-cloud \
-  --boot-disk-size=60GB --boot-disk-type=pd-balanced --tags=gatemoe --metadata=startup-script="$INSTALL"
+  --boot-disk-size=60GB --boot-disk-type=pd-balanced --tags=gatemoe \
+  --metadata-from-file=startup-script=gatemoe-startup.sh
 
 gcloud compute instances create gatemoe-arm --zone=us-central1-a --machine-type=t2a-standard-4 \
   --image-family=ubuntu-2404-lts-arm64 --image-project=ubuntu-os-cloud \
-  --boot-disk-size=60GB --boot-disk-type=pd-balanced --tags=gatemoe --metadata=startup-script="$INSTALL"
+  --boot-disk-size=60GB --boot-disk-type=pd-balanced --tags=gatemoe \
+  --metadata-from-file=startup-script=gatemoe-startup.sh
 ```
 
 Each VM installs itself on first boot (~30 min). Follow it with
