@@ -181,3 +181,20 @@ def test_compact_json_request(monkeypatch):
     assert out == {"cards": [{"front": "Q", "back": "A"}]}
     assert "grammar" in sent and "response_format" not in sent and sent["grammar"].startswith("root ::=")
     assert '"," " "? ' in sent["grammar"] and "\\n" not in sent["grammar"]   # spaces allowed, newlines not
+
+
+def test_environment_overrides_and_amx_detection(tmp_path, monkeypatch):
+    from gatemoe.runtime.model_manager import cpu_has_amx
+    monkeypatch.setenv("GATEMOE_THREADS", "6")
+    monkeypatch.setenv("GATEMOE_PASSWORD", "pw")
+    monkeypatch.setenv("GATEMOE_ALLOWED_HOSTS", "a.example, b.example")
+    monkeypatch.setenv("GATEMOE_DATA_DIR", str(tmp_path))
+    monkeypatch.delenv("GATEMOE_CONFIG", raising=False)
+    c = load_config()
+    assert c["hardware.threads"] == 6 and c["server.auth.password"] == "pw"
+    assert c["server.allowed_hosts"] == ["a.example", "b.example"] and c["paths.data_dir"] == str(tmp_path)
+    flags = tmp_path / "cpuinfo"
+    flags.write_text("processor : 0\nflags : fpu avx2 avx512f amx_tile amx_int8\n")
+    assert cpu_has_amx(str(flags))
+    flags.write_text("flags : fpu neon asimddp\n")
+    assert not cpu_has_amx(str(flags)) and not cpu_has_amx(str(tmp_path / "missing"))
