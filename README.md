@@ -1,8 +1,9 @@
 # GateMoE — an offline, router-orchestrated tutor on a Raspberry Pi 5
 
 GateMoE turns one learner request — *"Explain Ohm's law with a quiz and a podcast"*, in English,
-Hindi, Kannada, Tamil, Spanish, … — into a small lesson: study notes, flashcards, a quiz, a
-two-host podcast, a narrated explainer video and a code example. It runs **entirely on one
+Hindi, Kannada, Tamil, Spanish, … — into a small lesson: study notes with a concept map,
+flashcards, a quiz, a two-host podcast, a narrated explainer video, a code example, matching
+interactive PhET simulations and a printable handout. It runs **entirely on one
 Raspberry Pi 5 (8 GB)** with a 1 TB USB disk: no GPU, no cloud, no internet after setup.
 
 The point of the project is *conditional computation at model level*: a master router decides
@@ -17,9 +18,9 @@ request ─► language id ─► MASTER ROUTER (Cloudflare Clef-flash, one forw
             ┌─────────────────┼──────────────────────┬───────────────────────┐
      TEXT GATEWAY       KNOWLEDGE GATEWAY      SPEECH GATEWAY          VIDEO GATEWAY
    Qwen3.5-4B, JSON     Kiwix ZIM search        Supertonic 3 (31 langs)  Manim (maths) |
-   schemas per task     (Wikipedia offline)     MMS / Piper (Indic)      HyperFrames (text)
-                                                + config plugins         + FFmpeg
-                                                  (e.g. Fish Audio)     HANDOUT: Typst PDF
+   schemas per task     (Wikipedia, LibreTexts) MMS / Piper (Indic)      HyperFrames (text)
+   + Graphviz concept   + PhET simulations      + config plugins         + FFmpeg
+     maps                 (sandboxed, offline)    (e.g. Fish Audio)     HANDOUT: Typst PDF
 ```
 
 Only one big model is in RAM at a time (router ≈ 6 GB, generator ≈ 3 GB): the model manager
@@ -59,6 +60,7 @@ Full instructions: [docs/PI_SETUP.md](docs/PI_SETUP.md).
 * [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) — research questions and how to run them
 * [docs/PI_SETUP.md](docs/PI_SETUP.md) — install, memory settings, troubleshooting
 * [docs/EXTENDING.md](docs/EXTENDING.md) — plug in more voices (Fish Audio, Kokoro, …), video templates, ZIMs, languages
+* [docs/NEXT_STEPS.md](docs/NEXT_STEPS.md) — handover: current state, how to set up a session, prioritised open work
 * [research/](research/) — the multi-agent research/verification workflows, raw reports and the Clef CPU benchmark
 
 ## What is (and is not) claimed
@@ -85,4 +87,5 @@ weight-repack bug); never on the Pi.
 Code: MIT. Models and data keep their own licences — Clef-flash and Qwen3.5 (Apache-2.0),
 Supertonic 3 weights (OpenRAIL-M: label audio as AI-generated), Meta MMS voices
 (**CC-BY-NC-4.0**, non-commercial), Piper/piper-tts (GPL-3.0 runtime, per-voice cards),
-GSAP (GreenSock standard no-charge licence), Wikipedia/Kiwix content (CC BY-SA).
+GSAP (GreenSock standard no-charge licence), Wikipedia/Kiwix content (CC BY-SA), PhET simulations
+(CC BY 4.0, University of Colorado Boulder), LibreTexts (per-page CC licences), Graphviz (EPL).

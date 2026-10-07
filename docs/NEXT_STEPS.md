@@ -9,7 +9,7 @@ account). It is updated with every commit that changes the plan. Read it with
 Working end to end on x86 with the real models (Clef-flash router, Qwen3.5-4B generator):
 router -> plan -> Kiwix retrieval -> notes / flashcards / quiz / code / podcast script / video plan
 -> Supertonic or MMS speech -> Manim or HyperFrames video -> Typst handout, plus Graphviz concept
-maps and PhET simulations served from ZIM files. Web UI (phone-friendly) and CLI. 44 model-free tests.
+maps and PhET simulations served from ZIM files. Web UI (phone-friendly) and CLI. 48 model-free tests.
 
 Measured on a 2-thread x86 container (not a Pi): English lesson ~19 min, Kannada ~26 min; the router
 call is ~60 s (930 prompt tokens, no prefix cache possible); the generator runs at ~3.5 tok/s, so text
@@ -38,27 +38,11 @@ and run `GATEMOE_CONFIG=that.yaml gatemoe lesson "Explain Ohm's law with a quiz"
 
 ## Open work, in priority order
 
-### A. Review findings still to fix (from the adversarial review, run 1)
+### A. Review findings
 
-Reproduced by the reviewers unless marked. Fixed items are moved to the git log.
-
-1. llama-server orphaned on Ctrl+C / SIGTERM during `serve` or while a model loads; `/health` then
-   accepts the orphan as "ready" (two models resident -> OOM on the Pi). Fix: kill on BaseException in
-   `LlamaServer.start`, lifespan/atexit unload, refuse to start if the port already answers,
-   check `proc.poll()` after health.
-2. Knowledge: the global article cap is applied before the per-language quota, so English hits crowd
-   out learner-language articles (seen in the Kannada run: only English passages). Fix: per-language
-   article budget.
-3. Router failure kills the lesson; should degrade to `router.min_gateways`.
-4. Job worker thread dies on an OSError outside the try; cancelling a queued job never closes its
-   event log (SSE hangs); cancel/worker race.
-5. `detect_language` ignores languages from `--config`.
-6. Cancel is not honoured inside long LLM calls / TTS (needs an abortable HTTP call + kill).
-7. Unbounded `gateways` list / no queue limit on the API; whitespace-only request -> 500.
-8. Media: HyperFrames hold starts before the animation finishes on short narration; `narrate()` is
-   all-or-nothing; an unreachable preferred TTS plugin has no fallback to built-in voices.
-9. Smaller: non-atomic lesson.json write, redirect-unaware article de-dup, Anki TSV HTML escaping,
-   llama-server log growth, `pid` TOCTOU, Portuguese misdetected as English, plugin `prefer` default.
+All findings of review run 1 are fixed (commits "Fix review findings ..." and "Fix media review
+findings ...") except: podcast TTS checks for cancel only between lessons stages, not between turns
+(about 1 min on the Pi). The verification half of the review was not re-run (heavy).
 
 ### B. Optimisation work (deep, measured)
 
@@ -71,7 +55,8 @@ Reproduced by the reviewers unless marked. Fixed items are moved to the git log.
 3. **Router prompt size vs quality.** The schema is 92 % of Clef's prompt and cannot be cached.
    Build a small labelled request set (EN + Indic), then ablate question wording/count and quantisation
    (Q4_0 / IQ4_NL / Q3_K) for latency vs decision F1.
-4. **Retrieval quality.** Per-language quota fix (A2), then a small relevance check on the Kannada set.
+4. **Retrieval quality.** Done: per-language budget, rank fusion, LibreTexts JSON pages, subject-aware
+   archives (see RESEARCH_FINDINGS section 10). Next: a small labelled relevance set (EN + Indic).
 5. **CPU overlap.** TTS and Manim are CPU-bound; measure whether starting podcast TTS while the
    generator writes the video plan helps or hurts on 4 cores.
 6. **Pi validation.** Everything above is measured on x86 so far; repeat the key numbers on a Pi 5.

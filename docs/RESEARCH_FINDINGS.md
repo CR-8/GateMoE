@@ -120,3 +120,15 @@ Labels: **MEASURED** (we ran it), **VERIFIED** (primary source), **ESTIMATE** (r
 | Clef on ARM untested | `gatemoe route` and `gatemoe swapbench` exist to measure it on the real Pi first |
 | Multilingual scope | language registry: Supertonic voices for its 31 languages, sherpa-onnx MMS voices for Indic languages, Noto fonts for on-screen text |
 | Content-quality evaluation | open — see EXPERIMENTS.md |
+
+## 10. Findings from building and running it (7 Oct 2026, x86 container, real models)
+
+| Finding | Evidence | What changed |
+|---|---|---|
+| **Clef-flash can miss an explicitly requested artefact.** A Kannada request asking for "a small quiz, a podcast and a short video" was routed to podcast + video only. | P(quiz) = 0.30, P(podcast) = 0.94, P(video) = 0.67 (`e2e_kn2`, 930 prompt tokens, 59.6 s) | Reported as a router limitation; the UI's manual mode and `router.min_gateways` remain the escape hatches. Worth a labelled multilingual test set (see NEXT_STEPS B3). |
+| **A 4B planner may return no learner-language search queries** even when asked, so only English archives were searched for a Kannada lesson. | `search_queries_native: []` in the same run; all 5 passages English | The plan schema now requires 1-2 native queries for non-English learners, with key terms + the request as a fallback. |
+| **A global article cap defeats a per-language quota.** English queries are more numerous and filled every slot. | Reproduced by the review with the real ZIMs | Per-language article budget + reciprocal-rank fusion across queries; the Kannada re-run now returns 3 Kannada + 2 English passages. |
+| **Relaxing a query per archive pulls in junk.** "Ohm's law examples" relaxed to "examples" in a computing archive returned *Moving Picture Experts Group*. | `kb.search` traces | Relax only when no archive matched the exact query; topical archives (computer, medicine, ...) are searched only for their subject. |
+| **The 2026 LibreTexts ZIMs are single-page apps.** `index/page_N` is a meta-refresh stub, the text is `content/page_content_N.json`. The 370 MB K-12 archive contributed no text at all before this was handled. | ZIM layout probe | Reader for the openZIM MindTouch layout; photosynthesis / acids-and-bases / Ohm's-law queries now return textbook passages. |
+| **PhET ZIMs carry a sim catalogue** (`catalog.js`: id, localized title, categories) and each sim is a ~2.5 KB HTML page plus ~20 hashed JS files. | ZIM probe (phet_en_all 120 sims, phet_kn_all 71) | Deterministic title matching (14-query check: 10 sensible, 1 doubtful, 3 none); sims run offline in a sandboxed iframe (opaque origin, `connect-src 'none'`). |
+| **Graphviz SVG text is not portable.** Typst's SVG text path dropped Kannada anusvara; phones may lack fonts. | Rendered handout | Concept maps use `dot -Tsvg:cairo` (Pango-shaped glyph outlines) for the web page and the handout. |

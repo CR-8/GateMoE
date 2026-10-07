@@ -67,10 +67,10 @@ Built-in engines and their routing table live in `gatemoe/gateways/speech/podcas
 * Finally list the new planner template in `VIDEO_TEMPLATES` (`gateways/schemas.py`) with the
   engines that can render it — the planner's JSON schema is built from that table.
 
-Other renderers suited to scientific content that could become gateways the same way:
-Typst diagrams (`cetz` needs vendoring — Typst packages are fetched from the internet by default),
-Graphviz concept maps (`dot`, tiny on a Pi), Matplotlib plots, and the PhET simulations that
-Kiwix packages as ZIM files (link them from the notes).
+Already built in: **Graphviz concept maps** (`gateways/conceptmap.py`: the notes schema carries
+`concept_map` links, `dot` draws them) and **PhET simulations** (`knowledge/phet.py`, see below).
+Other renderers that could be added the same way: Typst diagrams (`cetz` needs vendoring — Typst
+packages are fetched from the internet by default) and Matplotlib plots.
 
 ## 3. Add offline knowledge
 
@@ -78,8 +78,14 @@ Drop any `.zim` file into `paths.zim_dir` (`gatemoe catalog` lists them). The kn
 picks archives by the ZIM's `Language` metadata (learner language first, then English) and boosts
 names matching the router's subject (`SUBJECT_HINTS` in `gatemoe/knowledge/__init__.py`).
 Good additions: `wikipedia_<lang>_all_nopic`, `libretexts.org_en_*`, `wikibooks_en_all`,
-`physics.stackexchange.com_en_all`, `devdocs_en_python`, PhET. Fetch the latest of each with
-`ZIMS="..." ./scripts/download_models.sh`.
+`physics.stackexchange.com_en_all`, `devdocs_en_python`. Fetch the latest of each with
+`ZIMS="..." ./scripts/download_models.sh`. Archives named after a subject (`physics`, `computer`,
+`medicine`, …) are only searched for that subject; general ones always.
+
+**Interactive simulations:** add `phet_<lang>_all` (60-150 MB each, ~100 languages on
+download.kiwix.org; English is the fallback). They are not used as text sources: their `catalog.js`
+is matched against the lesson's key terms and the sims appear in the Simulations tab, served by the
+app from the ZIM inside a sandbox. Tune `simulations.min_score` / `max_results` in the config.
 
 ## 4. Add a language
 
