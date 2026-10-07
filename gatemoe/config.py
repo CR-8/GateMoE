@@ -87,6 +87,32 @@ class Config:
             self.path(key).mkdir(parents=True, exist_ok=True)
 
 
+# Environment variables for container / cloud deployments (applied after the user YAML file).
+ENV_OVERRIDES = {
+    "GATEMOE_DATA_DIR": ("paths.data_dir", str),
+    "GATEMOE_THREADS": ("hardware.threads", int),
+    "GATEMOE_PORT": ("server.port", int),
+    "GATEMOE_USER": ("server.auth.user", str),
+    "GATEMOE_PASSWORD": ("server.auth.password", str),
+    "GATEMOE_ALLOWED_HOSTS": ("server.allowed_hosts", lambda v: [h.strip() for h in v.split(",") if h.strip()]),
+    "GATEMOE_MAX_PENDING_JOBS": ("server.max_pending_jobs", int),
+}
+
+
+def _env_overrides(environ) -> dict:
+    tree: dict = {}
+    for var, (dotted, conv) in ENV_OVERRIDES.items():
+        raw = environ.get(var)
+        if raw is None or raw == "":
+            continue
+        node = tree
+        *parents, leaf = dotted.split(".")
+        for part in parents:
+            node = node.setdefault(part, {})
+        node[leaf] = conv(raw)
+    return tree
+
+
 def load_config(path: str | os.PathLike | None = None, overrides: dict | None = None) -> Config:
     """Load packaged defaults, then the user file (arg or $GATEMOE_CONFIG), then overrides."""
     tree = yaml.safe_load((PKG_CONFIG_DIR / "default.yaml").read_text(encoding="utf-8"))
@@ -98,8 +124,7 @@ def load_config(path: str | os.PathLike | None = None, overrides: dict | None = 
         languages = _deep_merge(languages, user.pop("languages", {}) or {})
         tree = _deep_merge(tree, user)
         source = str(user_path)
-    if os.environ.get("GATEMOE_DATA_DIR"):
-        tree = _deep_merge(tree, {"paths": {"data_dir": os.environ["GATEMOE_DATA_DIR"]}})
+    tree = _deep_merge(tree, _env_overrides(os.environ))
     if overrides:
         tree = _deep_merge(tree, overrides)
     return Config(_resolve(tree), languages, source)

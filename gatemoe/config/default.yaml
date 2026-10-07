@@ -26,6 +26,7 @@ llama:
   extra_args: []                              # x86 CPUs with AMX need ["-nr"] (weight-repack bug)
   ready_timeout_s: 1200                       # cold load of 5.6 GB: ~1 min from a USB HDD, much longer from a slow SD card
   stop_timeout_s: 20
+  auto_no_repack: true                        # add -nr on CPUs with Intel AMX (llama.cpp repack crash; cloud VMs)
   lock_timeout_s: 900                         # a 2nd GateMoE process (CLI next to `serve`) waits this long for the model slot
 
 # Only ONE big model is resident at a time (8 GB RAM). The manager swaps them.
@@ -140,5 +141,8 @@ server:
   host: 0.0.0.0
   port: 8000
   max_pending_jobs: 20       # queued + running lessons accepted at once (HTTP 429 beyond)
+  auth:                      # optional login (HTTP Basic) - set a password when the server is reachable
+    user: gatemoe            # from the internet (env GATEMOE_PASSWORD / GATEMOE_USER)
+    password: ""
   allowed_hosts: []          # extra Host names; IP addresses, localhost, *.local and this machine's
                              # hostname are always allowed (blocks DNS-rebinding from web pages)

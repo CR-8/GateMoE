@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import hmac
 import ipaddress
 import json
 import queue
@@ -40,6 +42,18 @@ class LessonIn(BaseModel):
     language: str = "auto"                       # 'auto' or a code from languages.yaml
     mode: str | None = None                      # clef | all | manual (None = config default)
     gateways: list[str] | None = Field(None, max_length=len(GATEWAYS))   # for mode=manual
+
+
+def basic_auth_ok(header: str, user: str, password: str) -> bool:
+    if not header.lower().startswith("basic "):
+        return False
+    try:
+        given_user, _, given_pw = base64.b64decode(header[6:].strip()).decode("utf-8").partition(":")
+    except (ValueError, UnicodeDecodeError):
+        return False
+    ok_user = hmac.compare_digest(given_user.encode(), user.encode())
+    ok_pw = hmac.compare_digest(given_pw.encode(), password.encode())
+    return ok_user and ok_pw
 
 
 def host_allowed(host_header: str, extra: list[str]) -> bool:
@@ -81,6 +95,19 @@ def create_app(cfg: Config | None = None, jobs: JobManager | None = None) -> Fas
     app.state.cfg, app.state.jobs = cfg, jobs
     extra_hosts = [str(h).lower() for h in cfg.get("server.allowed_hosts", []) or []]
 
+    auth_user = str(cfg.get("server.auth.user") or "gatemoe")
+    auth_password = str(cfg.get("server.auth.password") or "")
+
+    @app.middleware("http")
+    async def check_auth(request, call_next):
+        # Optional login for servers reachable from the internet (cloud VMs): HTTP Basic, so the
+        # browser asks once and then sends it with every request, including sandboxed sim assets.
+        if auth_password and request.url.path != "/healthz" and not basic_auth_ok(
+                request.headers.get("authorization", ""), auth_user, auth_password):
+            return PlainTextResponse("login required", status_code=401,
+                                     headers={"WWW-Authenticate": 'Basic realm="GateMoE", charset="UTF-8"'})
+        return await call_next(request)
+
     @app.middleware("http")
     async def check_host(request, call_next):
         # A web page on the internet can point its own domain at the Pi (DNS rebinding) and then
@@ -89,6 +116,11 @@ def create_app(cfg: Config | None = None, jobs: JobManager | None = None) -> Fas
             return PlainTextResponse("host not allowed (add it to server.allowed_hosts)", status_code=403)
         return await call_next(request)
     kb = KnowledgeBase(cfg)
+
+    @app.get("/healthz")
+    def healthz() -> dict:
+        """Liveness for containers / load balancers (no login, no model work)."""
+        return {"ok": True}
 
     @app.get("/", response_class=HTMLResponse)
     def index() -> HTMLResponse:

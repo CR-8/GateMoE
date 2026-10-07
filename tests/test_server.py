@@ -122,3 +122,24 @@ def test_cancel_queued_job_ends_its_stream(cfg):
     while jobs.get(first.id).status != "done" and time.time() - wait < 10:
         time.sleep(0.05)
     assert jobs.get(first.id).status == "done"
+
+
+def test_password_login_and_healthz(cfg):
+    import base64
+
+    from gatemoe.config import load_config
+    from gatemoe.server.app import basic_auth_ok
+    assert basic_auth_ok("Basic " + base64.b64encode(b"gatemoe:s3cret").decode(), "gatemoe", "s3cret")
+    assert not basic_auth_ok("Basic " + base64.b64encode(b"gatemoe:wrong").decode(), "gatemoe", "s3cret")
+    assert not basic_auth_ok("Bearer x", "gatemoe", "s3cret") and not basic_auth_ok("Basic !!!", "gatemoe", "s3cret")
+    locked = load_config(overrides={**{"paths": {"data_dir": str(cfg["paths.data_dir"])}},
+                                    "server": {"allowed_hosts": ["testserver"],
+                                               "auth": {"user": "gatemoe", "password": "s3cret"}}})
+    pipe = FakePipeline()
+    client = TestClient(create_app(locked, JobManager(locked, lambda: pipe)))
+    assert client.get("/healthz").json() == {"ok": True}                       # load balancers need no login
+    r = client.get("/api/config")
+    assert r.status_code == 401 and r.headers["www-authenticate"].startswith("Basic")
+    assert client.get("/api/config", auth=("gatemoe", "s3cret")).status_code == 200
+    assert client.get("/", auth=("gatemoe", "nope")).status_code == 401
+    pipe.gate.set()

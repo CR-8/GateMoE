@@ -22,6 +22,17 @@ except ImportError:          # not on Linux: the cross-process guard is skipped
     fcntl = None
 
 
+def cpu_has_amx(cpuinfo: str = "/proc/cpuinfo") -> bool:
+    try:
+        with open(cpuinfo, encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                if line.startswith("flags"):
+                    return "amx_tile" in line.split()
+    except OSError:
+        pass
+    return False
+
+
 class ModelManager:
     def __init__(self, cfg: Config):
         self.cfg = cfg
@@ -86,6 +97,10 @@ class ModelManager:
             argv += ["-b", ctx, "-ub", ctx]
         argv += [str(a) for a in m.get("args", [])]
         argv += [str(a) for a in self.cfg.get("llama.extra_args", []) or []]
+        if self.cfg.get("llama.auto_no_repack", True) and cpu_has_amx() and not {"-nr", "--no-repack"} & set(argv):
+            # llama.cpp aborts while repacking weights for AMX (Sapphire Rapids and newer: common
+            # on cloud VMs); plain AVX-512/AVX2 kernels are used instead. Never needed on the Pi.
+            argv.append("-nr")
         return argv
 
     def _server(self, role: str) -> LlamaServer:
