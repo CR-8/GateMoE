@@ -2,19 +2,23 @@
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import json
 import queue
+import socket
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from urllib.parse import quote
 
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response, StreamingResponse
+from fastapi.responses import (FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse, Response,
+                               StreamingResponse)
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from ..config import Config, load_config
-from ..jobs import JobManager
+from ..jobs import JobManager, QueueFull
 from ..knowledge import KnowledgeBase
 from ..router.clef import GATEWAYS
 from ..runtime import sysinfo
@@ -35,7 +39,26 @@ class LessonIn(BaseModel):
     request: str = Field(..., min_length=1, max_length=2000)
     language: str = "auto"                       # 'auto' or a code from languages.yaml
     mode: str | None = None                      # clef | all | manual (None = config default)
-    gateways: list[str] | None = None            # for mode=manual
+    gateways: list[str] | None = Field(None, max_length=len(GATEWAYS))   # for mode=manual
+
+
+def host_allowed(host_header: str, extra: list[str]) -> bool:
+    """Accept IP literals, localhost, *.local, this machine's name and configured names."""
+    h = (host_header or "").strip().lower()
+    if h.startswith("["):                                   # [::1]:8000
+        h = h[1:].split("]", 1)[0]
+    elif h.count(":") == 1:
+        h = h.split(":", 1)[0]
+    h = h.rstrip(".")
+    if not h:
+        return False
+    if "*" in extra or h in extra or h == "localhost" or h.endswith(".local"):
+        return True
+    try:
+        ipaddress.ip_address(h)
+        return True
+    except ValueError:
+        return h == socket.gethostname().lower()
 
 
 def create_app(cfg: Config | None = None, jobs: JobManager | None = None) -> FastAPI:
@@ -44,8 +67,27 @@ def create_app(cfg: Config | None = None, jobs: JobManager | None = None) -> Fas
     if jobs is None:
         from ..pipeline import LessonPipeline
         jobs = JobManager(cfg, lambda: LessonPipeline(cfg))
-    app = FastAPI(title="GateMoE", docs_url="/api/docs")
+    @asynccontextmanager
+    async def lifespan(_app):
+        yield
+        # shutdown (Ctrl+C / SIGTERM): stop the running lesson and never leave a model resident
+        for job in jobs.list():
+            if job.status == "running":
+                jobs.cancel(job.id)
+        if jobs._pipeline is not None:
+            jobs._pipeline.models.unload()
+
+    app = FastAPI(title="GateMoE", docs_url="/api/docs", lifespan=lifespan)
     app.state.cfg, app.state.jobs = cfg, jobs
+    extra_hosts = [str(h).lower() for h in cfg.get("server.allowed_hosts", []) or []]
+
+    @app.middleware("http")
+    async def check_host(request, call_next):
+        # A web page on the internet can point its own domain at the Pi (DNS rebinding) and then
+        # drive this API from a learner's browser; requests by name must name this machine.
+        if not host_allowed(request.headers.get("host", ""), extra_hosts):
+            return PlainTextResponse("host not allowed (add it to server.allowed_hosts)", status_code=403)
+        return await call_next(request)
     kb = KnowledgeBase(cfg)
 
     @app.get("/", response_class=HTMLResponse)
@@ -82,8 +124,13 @@ def create_app(cfg: Config | None = None, jobs: JobManager | None = None) -> Fas
             raise HTTPException(400, "mode must be clef, all or manual")
         if body.gateways and any(g not in GATEWAYS for g in body.gateways):
             raise HTTPException(400, f"gateways must be among {list(GATEWAYS)}")
-        job = jobs.submit(body.request, {"language": body.language, "mode": body.mode,
-                                         "gateways": body.gateways})
+        try:
+            job = jobs.submit(body.request, {"language": body.language, "mode": body.mode,
+                                             "gateways": sorted(set(body.gateways)) if body.gateways else None})
+        except QueueFull as exc:
+            raise HTTPException(429, str(exc))
+        except ValueError as exc:            # e.g. a whitespace-only request
+            raise HTTPException(400, str(exc))
         return job.public()
 
     @app.get("/api/lessons")

@@ -109,7 +109,7 @@ class TextGateway:
         return int(int(self.cfg[f"generation.max_tokens.{task}"]) * float(self.info.get("token_factor", 1.0)))
 
     def plan(self) -> dict:
-        return self.gen.chat_json(self._messages(self._fmt("plan")), schemas.plan_schema(),
+        return self.gen.chat_json(self._messages(self._fmt("plan")), schemas.plan_schema(self.lang == "en"),
                                   name="plan", max_tokens=self._budget("plan"))
 
     def generate(self, task: str, video_engine: str | None = None) -> dict:

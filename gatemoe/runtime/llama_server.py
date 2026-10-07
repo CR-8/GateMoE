@@ -30,17 +30,35 @@ class LlamaServer:
 
     @property
     def pid(self) -> int | None:
-        return self.proc.pid if self.proc and self.proc.poll() is None else None
+        proc = self.proc                      # stop() may clear self.proc from another thread
+        return proc.pid if proc is not None and proc.poll() is None else None
 
     def running(self) -> bool:
         return self.pid is not None
 
-    def _log_tail(self, n: int = 30) -> str:
+    def _log_tail(self, n: int = 30, max_bytes: int = 64_000) -> str:
         try:
-            lines = self.log_path.read_text(errors="replace").splitlines()
+            with self.log_path.open("rb") as fh:
+                fh.seek(0, 2)
+                fh.seek(max(0, fh.tell() - max_bytes))
+                lines = fh.read().decode("utf-8", "replace").splitlines()
             return "\n".join(lines[-n:])
         except OSError:
             return ""
+
+    def _port_answers(self) -> bool:
+        try:
+            get_json(self.base_url + "/health", timeout=1)
+            return True
+        except OSError:
+            return False
+
+    def _rotate_log(self, max_bytes: int = 5_000_000) -> None:
+        try:
+            if self.log_path.stat().st_size > max_bytes:
+                self.log_path.replace(self.log_path.with_suffix(".log.1"))
+        except OSError:
+            pass
 
     def start(self, cancel_check: Callable[[], None] | None = None) -> float:
         """Spawn the server and block until /health is OK. Returns load seconds."""
@@ -52,57 +70,64 @@ class LlamaServer:
         model = Path(self.argv[self.argv.index("-m") + 1])
         if not model.exists():
             raise ServerError(f"model file not found: {model}")
+        if self._port_answers():
+            # Another server (often an orphan of a crashed run) owns the port: its /health would be
+            # mistaken for ours and two models would end up resident.
+            raise ServerError(f"port {self.base_url} is already in use - stop the other llama-server first")
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
+        self._rotate_log()
         log = self.log_path.open("ab")
         env = dict(os.environ)
         for key in ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY"):
             env.pop(key, None)  # fully offline; the server never needs the network
         t0 = time.perf_counter()
-        self.proc = subprocess.Popen(self.argv, stdout=log, stderr=subprocess.STDOUT,
-                                     stdin=subprocess.DEVNULL, env=env, start_new_session=True)
-        log.close()
+        try:
+            self.proc = subprocess.Popen(self.argv, stdout=log, stderr=subprocess.STDOUT,
+                                         stdin=subprocess.DEVNULL, env=env, start_new_session=True)
+        finally:
+            log.close()
         deadline = t0 + self.ready_timeout_s
-        while True:
-            if self.proc.poll() is not None:
-                raise ServerError(f"{self.name} server exited with code {self.proc.returncode}:\n{self._log_tail()}")
-            try:
-                status, body = get_json(self.base_url + "/health", timeout=2)
-                if status == 200:
-                    break
-            except OSError:
-                pass
-            if time.perf_counter() > deadline:
-                self.stop()
-                raise ServerError(f"{self.name} server not ready after {self.ready_timeout_s}s:\n{self._log_tail()}")
-            if cancel_check:
+        try:   # any exit from here other than "ready" (error, cancel, Ctrl+C) must kill the child
+            while True:
+                if self.proc.poll() is not None:
+                    raise ServerError(f"{self.name} server exited with code {self.proc.returncode}:\n{self._log_tail()}")
                 try:
+                    status, body = get_json(self.base_url + "/health", timeout=2)
+                    if status == 200 and self.proc.poll() is None:
+                        break
+                except OSError:
+                    pass
+                if time.perf_counter() > deadline:
+                    raise ServerError(f"{self.name} server not ready after {self.ready_timeout_s}s:\n{self._log_tail()}")
+                if cancel_check:
                     cancel_check()
-                except BaseException:
-                    self.stop()
-                    raise
-            time.sleep(0.5)
+                time.sleep(0.5)
+        except BaseException:
+            self.stop()
+            raise
         self.load_seconds = time.perf_counter() - t0
         return self.load_seconds
 
     def stop(self) -> dict:
         """Terminate the server; returns peak/last RSS (MB) read just before exit."""
         stats: dict = {}
-        if not self.proc:
+        proc = self.proc
+        if not proc:
             return stats
-        if self.proc.poll() is None:
-            st = proc_status_mb(self.proc.pid)
+        if proc.poll() is None:
+            st = proc_status_mb(proc.pid)
             stats = {"peak_rss_mb": round(st.get("VmHWM", 0)), "rss_mb": round(st.get("VmRSS", 0))}
             try:
-                os.killpg(self.proc.pid, signal.SIGTERM)
+                os.killpg(proc.pid, signal.SIGTERM)
             except ProcessLookupError:
                 pass
             try:
-                self.proc.wait(timeout=self.stop_timeout_s)
+                proc.wait(timeout=self.stop_timeout_s)
             except subprocess.TimeoutExpired:
                 try:
-                    os.killpg(self.proc.pid, signal.SIGKILL)
+                    os.killpg(proc.pid, signal.SIGKILL)
                 except ProcessLookupError:
                     pass
-                self.proc.wait(timeout=10)
+                proc.wait(timeout=10)
         self.proc = None
         return stats

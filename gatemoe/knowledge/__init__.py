@@ -9,7 +9,9 @@ No index is built on the Pi: every Kiwix ZIM ships its own full-text index.
 """
 from __future__ import annotations
 
+import json
 import math
+import re
 import threading
 import time
 import unicodedata
@@ -166,27 +168,34 @@ class KnowledgeBase:
         """Which collections to search (learner language first, then English), subject-matching first."""
         langs = [lang] + (["en"] if self.cfg["knowledge.include_english"] and lang != "en" else [])
         hints = SUBJECT_HINTS.get(subject, [])
+        all_hints = {h for hs in SUBJECT_HINTS.values() for h in hs}
+
+        def fits(name: str) -> bool:   # general archives always; topical ones only for their subject
+            name = name.lower()
+            return not hints or any(h in name for h in hints) or not any(h in name for h in all_hints)
+
         chosen = []
         for lg in langs:
             zims = [z for z in self.catalog()
-                    if z.get("lang") == lg and "error" not in z and z.get("kind") == "text"]
+                    if z.get("lang") == lg and "error" not in z and z.get("kind") == "text" and fits(z["name"])]
             zims.sort(key=lambda z: (not any(h in z["name"].lower() for h in hints), -z.get("size_mb", 0)))
             chosen += zims[: int(self.cfg.get("knowledge.max_zims_per_language", 3))]
         return chosen
 
     # -- search ------------------------------------------------------------------------------
-    def _search_one(self, z: dict, query: str, k: int) -> list[str]:
-        """Full-text search with progressive relaxation (Xapian matches ALL words of a query, and
-        there is no stemming for most Indic languages): full query -> first two words -> each of
+    def _search_one(self, z: dict, query: str, k: int, relax: bool = True) -> list[str]:
+        """Full-text search; with ``relax`` progressively looser (Xapian matches ALL words of a query,
+        and there is no stemming for most Indic languages): full query -> first two words -> each of
         the first three words -> title suggestions."""
         from libzim.suggestion import SuggestionSearcher
 
         a = self._archive(z["file"])
         words = list(dict.fromkeys(w for w in tokenize(query) if len(w) > 1))   # original order, deduped
         attempts = [query]
-        if len(words) > 2:
-            attempts.append(" ".join(words[:2]))        # learner requests usually start with the topic
-        attempts += [w for w in words[:3] if w not in attempts]
+        if relax:
+            if len(words) > 2:
+                attempts.append(" ".join(words[:2]))    # learner requests usually start with the topic
+            attempts += [w for w in words[:3] if w not in attempts]
         found: list[str] = []
         if z.get("fulltext"):
             from libzim.search import Query, Searcher
@@ -194,13 +203,25 @@ class KnowledgeBase:
                 found = list(Searcher(a).search(Query().set_query(q)).getResults(0, k))
                 if found:
                     return found
-        for q in [query] + words[:2]:
+        for q in [query] + (words[:2] if relax else []):
             for path in SuggestionSearcher(a).suggest(q).getResults(0, k):
                 if path not in found:
                     found.append(path)
             if len(found) >= k:
                 break
         return found[:k]
+
+    def _resolve(self, z: dict, path: str) -> str | None:
+        """Final path of an entry after following redirects (None if missing or a redirect loop)."""
+        try:
+            entry = self._archive(z["file"]).get_entry_by_path(path)
+        except KeyError:
+            return None
+        for _ in range(5):
+            if not entry.is_redirect:
+                return entry.path
+            entry = entry.get_redirect_entry()
+        return None
 
     def _article(self, z: dict, path: str) -> tuple[str, list[str]] | None:
         a = self._archive(z["file"])
@@ -212,7 +233,19 @@ class KnowledgeBase:
         item = entry.get_item()
         if not item.mimetype.startswith("text/html"):
             return None
-        paras = html_to_paragraphs(bytes(item.content).decode("utf-8", "replace"))
+        html = bytes(item.content).decode("utf-8", "replace")
+        # openZIM MindTouch scraper (LibreTexts): "index/page_N" is a meta-refresh stub for a
+        # single-page app; the text is "content/page_content_N.json" -> {"htmlBody": ...}
+        m = re.fullmatch(r"index/page_(\d+)", entry.path)
+        if m and len(html) < 2000:
+            a = self._archive(z["file"])
+            side = f"content/page_content_{m.group(1)}.json"
+            if a.has_entry_by_path(side):
+                try:
+                    html = json.loads(bytes(a.get_entry_by_path(side).get_item().content)).get("htmlBody") or ""
+                except (ValueError, AttributeError):
+                    html = ""
+        paras = html_to_paragraphs(html)
         return (entry.title, paras) if paras else None
 
     def search(self, queries: list[tuple[str, str]], learner_lang: str, subject: str = "other",
@@ -226,23 +259,52 @@ class KnowledgeBase:
         k = int(self.cfg["knowledge.max_articles"])
         hits: list[tuple[int, dict, str]] = []           # (rank, zim, path)
         for q, qlang in queries:
-            for z in zims:
-                if qlang != z["lang"]:          # English queries -> English ZIMs, native -> native
-                    continue
-                try:
-                    for rank, path in enumerate(self._search_one(z, q, k)):
-                        hits.append((rank, z, path))
-                except Exception:
-                    continue
-        seen, ordered = set(), []
-        for rank, z, path in sorted(hits, key=lambda h: h[0]):   # interleave queries/zims by rank
-            key = (z["file"], path)
-            if key not in seen:
-                seen.add(key)
-                ordered.append((z, path))
+            targets = [z for z in zims if z["lang"] == qlang]   # English queries -> English ZIMs, native -> native
+            # exact query in every archive first; loosen it only if no archive matched it at all
+            # (relaxing per archive turns "Ohm's law examples" into "examples" in a computing ZIM)
+            for relax in (False, True):
+                found = 0
+                for z in targets:
+                    try:
+                        for rank, path in enumerate(self._search_one(z, q, k, relax=relax)):
+                            hits.append((rank, z, path))
+                            found += 1
+                    except Exception:
+                        continue
+                if found:
+                    break
+        # Reciprocal-rank fusion over queries and archives, on the resolved article (redirects such as
+        # "Ohm" -> "Ohm's_law" merge): an article several queries agree on outranks a one-off top hit.
+        fused: dict[tuple[str, str], float] = {}
+        where: dict[tuple[str, str], dict] = {}
+        for rank, z, path in hits:
+            final = self._resolve(z, path)
+            if final is None:
+                continue
+            key = (z["file"], final)
+            fused[key] = fused.get(key, 0.0) + 1.0 / (1 + rank)
+            where[key] = z
+        by_lang: dict[str, list[tuple[float, dict, str]]] = {}
+        for key, score in sorted(fused.items(), key=lambda kv: -kv[1]):
+            z = where[key]
+            by_lang.setdefault(z["lang"], []).append((score, z, key[1]))
+        # every language gets its own share of the article budget: English queries are more numerous
+        # and would otherwise fill all k slots before one learner-language article is fetched
+        langs = list(dict.fromkeys(lg for lg in [learner_lang] + sorted(by_lang) if lg in by_lang))
+        picked: list[tuple[float, dict, str]] = []
+        for gi, lg in enumerate(langs):
+            remaining = k - len(picked)
+            quota = remaining if gi == len(langs) - 1 else max(1, math.ceil(remaining / (len(langs) - gi)))
+            picked += by_lang[lg][:quota]
+        if len(picked) < k:                                # hand unused slots back, best first
+            have = {(z["file"], path) for _, z, path in picked}
+            spare = sorted((t for lg in langs for t in by_lang[lg] if (t[1]["file"], t[2]) not in have),
+                           key=lambda t: -t[0])
+            picked += spare[: k - len(picked)]
+        top_fused = {lg: by_lang[lg][0][0] for lg in langs}
         t_search = time.perf_counter() - t0
         passages, words = [], int(self.cfg["knowledge.passage_words"])
-        for art_rank, (z, path) in enumerate(ordered[: k]):
+        for score, z, path in picked:
             try:
                 art = self._article(z, path)
             except Exception:
@@ -250,9 +312,9 @@ class KnowledgeBase:
             if not art:
                 continue
             title, paras = art
-            for text in split_passages(paras, words):
+            for text in split_passages(paras, words):   # fused article score as a prior (0..1]
                 passages.append({"title": title, "zim": z["name"], "path": path, "lang": z["lang"], "text": text,
-                                 "_prior": 1.0 / (1 + art_rank)})   # trust Xapian's article ranking a little
+                                 "_prior": score / top_fused[z["lang"]]})
         # BM25 within each language (scores are not comparable across scripts), then split the quota:
         # learner-language passages first, English ones after (often the more complete source).
         n_total = int(self.cfg["knowledge.max_passages"])
@@ -272,6 +334,6 @@ class KnowledgeBase:
             quota = remaining if gi == len(langs) - 1 else max(1, math.ceil(remaining / (len(langs) - gi)))
             top += sorted(group, key=lambda p: p["score"], reverse=True)[:quota]
         if events:
-            events.emit("kb_search", zims=[z["name"] for z in zims], articles=len(ordered[:k]),
+            events.emit("kb_search", zims=[z["name"] for z in zims], articles=len(picked),
                         passages=len(top), search_s=round(t_search, 3), total_s=round(time.perf_counter() - t0, 3))
         return top

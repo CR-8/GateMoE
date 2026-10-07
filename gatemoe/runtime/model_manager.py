@@ -6,12 +6,20 @@ routing saves.
 """
 from __future__ import annotations
 
+import atexit
+import os
 import threading
+import time
 from pathlib import Path
 
 from ..config import Config
 from .events import EventLog
-from .llama_server import LlamaServer
+from .llama_server import LlamaServer, ServerError
+
+try:
+    import fcntl
+except ImportError:          # not on Linux: the cross-process guard is skipped
+    fcntl = None
 
 
 class ModelManager:
@@ -21,6 +29,50 @@ class ModelManager:
         self.lock = threading.RLock()
         self.log_dir = cfg.path("paths.cache_dir") / "logs"
         self.history: list[dict] = []   # recent loads/unloads, for /api/system
+        self._host_fd: int | None = None
+        atexit.register(self._atexit)    # Ctrl+C / normal exit must not orphan a 3-6 GB server
+
+    # -- one model per MACHINE: a second GateMoE process (CLI next to `serve`) waits ----------
+    def _take_host_lock(self, events: EventLog | None) -> None:
+        if self._host_fd is not None or fcntl is None:
+            return
+        path = self.log_dir.parent / "models.lock"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o644)
+        deadline = time.monotonic() + float(self.cfg.get("llama.lock_timeout_s", 900))
+        announced = False
+        try:
+            while True:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    if events and not announced:
+                        events.emit("model_wait", reason="another GateMoE process has a model loaded")
+                        announced = True
+                    if time.monotonic() > deadline:
+                        raise ServerError("another GateMoE process keeps a model loaded (see llama.lock_timeout_s)")
+                    if events:
+                        events.check_cancel()
+                    time.sleep(1)
+        except BaseException:
+            os.close(fd)
+            raise
+        self._host_fd = fd
+
+    def _release_host_lock(self) -> None:
+        fd, self._host_fd = self._host_fd, None
+        if fd is not None:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_UN)
+            finally:
+                os.close(fd)
+
+    def _atexit(self) -> None:
+        try:
+            self.unload()
+        except Exception:
+            pass
 
     def argv(self, role: str) -> list[str]:
         m = self.cfg[f"models.{role}"]
@@ -50,12 +102,17 @@ class ModelManager:
                 if events:
                     events.emit("model_hit", role=role)
                 return self.current
-            self.unload(events)
+            self._take_host_lock(events)
+            self._unload_current(events)
             server = self._server(role)
             path: Path = self.cfg.model_path(role)
             if events:
                 events.emit("model_loading", role=role, file=path.name)
-            seconds = server.start(cancel_check=events.check_cancel if events else None)
+            try:
+                seconds = server.start(cancel_check=events.check_cancel if events else None)
+            except BaseException:
+                self._release_host_lock()
+                raise
             self.current = server
             rec = {"role": role, "file": path.name, "size_mb": round(path.stat().st_size / 2**20),
                    "seconds": round(seconds, 3)}
@@ -65,6 +122,13 @@ class ModelManager:
             return server
 
     def unload(self, events: EventLog | None = None) -> None:
+        with self.lock:
+            try:
+                self._unload_current(events)
+            finally:
+                self._release_host_lock()
+
+    def _unload_current(self, events: EventLog | None = None) -> None:
         with self.lock:
             if not self.current:
                 return

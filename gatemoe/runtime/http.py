@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import json
+import threading
 import urllib.error
 import urllib.request
-from typing import Any
+from typing import Any, Callable
 
 
 class HTTPError(RuntimeError):
@@ -32,11 +33,35 @@ def get_json(url: str, timeout: float = 10.0) -> tuple[int, Any]:
         return status, raw.decode("utf-8", "replace")
 
 
-def post_json(url: str, body: Any, timeout: float = 600.0) -> Any:
+def _open_cancellable(req: urllib.request.Request, timeout: float,
+                      cancel_check: Callable[[], None]) -> tuple[int, bytes]:
+    """Run the request in a helper thread and poll ``cancel_check`` (which raises to abort).
+    The abandoned request ends when the caller unloads the model server it was talking to."""
+    box: dict = {}
+
+    def run():
+        try:
+            box["result"] = _open(req, timeout)
+        except BaseException as exc:          # delivered to the waiting thread
+            box["error"] = exc
+
+    th = threading.Thread(target=run, name="http-call", daemon=True)
+    th.start()
+    while th.is_alive():
+        th.join(0.25)
+        if th.is_alive():
+            cancel_check()
+    if "error" in box:
+        raise box["error"]
+    return box["result"]
+
+
+def post_json(url: str, body: Any, timeout: float = 600.0,
+              cancel_check: Callable[[], None] | None = None) -> Any:
     data = json.dumps(body, ensure_ascii=False).encode("utf-8")
     req = urllib.request.Request(url, data=data, method="POST",
                                  headers={"Content-Type": "application/json"})
-    status, raw = _open(req, timeout)
+    status, raw = _open_cancellable(req, timeout, cancel_check) if cancel_check else _open(req, timeout)
     text = raw.decode("utf-8", "replace")
     if status >= 400:
         raise HTTPError(status, text, url)

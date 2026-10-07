@@ -17,6 +17,10 @@ from .runtime.events import Cancelled, EventLog
 _ID = re.compile(r"^[a-f0-9]{12}$")
 
 
+class QueueFull(RuntimeError):
+    pass
+
+
 @dataclass
 class Job:
     id: str
@@ -87,6 +91,9 @@ class JobManager:
             raise ValueError("request too long (max 2000 characters)")
         job = Job(id=uuid.uuid4().hex[:12], request=request, options=options or {})
         with self._lock:
+            pending = sum(1 for j in self.jobs.values() if j.status in ("queued", "running"))
+            if pending >= int(self.cfg.get("server.max_pending_jobs", 20)):
+                raise QueueFull(f"{pending} lessons are already waiting - try again later")
             self.jobs[job.id] = job
             self.logs[job.id] = EventLog(self.job_dir(job.id) / "events.jsonl")
         self._save(job)
@@ -111,39 +118,67 @@ class JobManager:
 
     def cancel(self, job_id: str) -> Job:
         job = self.jobs[job_id]
-        if job.status == "queued":
-            job.status, job.finished = "cancelled", time.time()
+        with self._lock:                   # the worker flips queued -> running under the same lock
+            was_queued = job.status == "queued"
+            if was_queued:
+                job.status, job.finished = "cancelled", time.time()
+            log = self.logs.get(job_id)
+            if job.status == "running" and log is not None:
+                log.cancel_flag.set()
+        if was_queued:
             self._save(job)
-        elif job.status == "running" and job_id in self.logs:
-            self.logs[job_id].cancel_flag.set()
+            self._finish_log(job)          # end the SSE stream of a job that never started
         return job
+
+    def _finish_log(self, job: Job) -> None:
+        log = self.logs.get(job.id)
+        if log is None:
+            return
+        try:
+            log.emit("job_end", status=job.status, error=job.error)
+        finally:
+            log.close()
+            with self._lock:                # late subscribers replay events.jsonl from disk
+                self.logs.pop(job.id, None)
 
     # -- worker ------------------------------------------------------------------------------
     def _loop(self) -> None:
         while True:
             job_id = self._queue.get()
+            try:
+                self._run_one(job_id)
+            except Exception:              # the only worker must survive anything (e.g. a full disk)
+                traceback.print_exc()
+
+    def _run_one(self, job_id: str) -> None:
+        with self._lock:
             job = self.jobs.get(job_id)
             if not job or job.status != "queued":
-                continue
+                return
             ev = self.logs[job_id]
             job.status, job.started = "running", time.time()
+        try:
             self._save(job)
             ev.emit("job_start")
+            self.pipeline.run(job.request, self.job_dir(job_id), ev, job.options)
+            job.status = "done"
+        except Cancelled:
+            job.status = "cancelled"
+        except Exception as exc:
+            job.status, job.error = "failed", f"{type(exc).__name__}: {exc}"
             try:
-                self.pipeline.run(job.request, self.job_dir(job_id), ev, job.options)
-                job.status = "done"
-            except Cancelled:
-                job.status = "cancelled"
-            except Exception as exc:
-                job.status, job.error = "failed", f"{type(exc).__name__}: {exc}"
                 ev.emit("error", error=job.error, trace=traceback.format_exc(limit=8))
-            finally:
-                # never leave a 6 GB model resident after a failure or cancel
-                try:
-                    self.pipeline.models.unload(ev)
-                except Exception:
-                    pass
-                job.finished = time.time()
+            except Exception:
+                pass
+        finally:
+            # never leave a 6 GB model resident after a failure or cancel; each step best-effort
+            try:
+                self.pipeline.models.unload(ev)
+            except Exception:
+                pass
+            job.finished = time.time()
+            try:
                 self._save(job)
-                ev.emit("job_end", status=job.status, error=job.error)
-                ev.close()
+            except Exception:
+                traceback.print_exc()
+            self._finish_log(job)

@@ -169,7 +169,8 @@ class ClefRouter:
         server = self.models.acquire("router", events)
         t = time.perf_counter()
         resp = post_json(server.base_url + "/v1/systemone", {"state": state, "questions": questions},
-                         timeout=float(self.cfg["models.router.request_timeout_s"]))
+                         timeout=float(self.cfg["models.router.request_timeout_s"]),
+                         cancel_check=events.check_cancel if events else None)
         latency = time.perf_counter() - t
         answers = resp.get("answers") or {}
         dec = parse_answers(answers, self.cfg)

@@ -11,7 +11,9 @@ Every stage and model swap is timed in events.jsonl.
 """
 from __future__ import annotations
 
+import html
 import json
+import re
 import time
 from pathlib import Path
 
@@ -26,7 +28,7 @@ from .knowledge.phet import SimulationFinder
 from .langid import detect_language
 from .llm.client import Generator
 from .registry import specialists
-from .router.clef import ClefRouter
+from .router.clef import GATEWAYS, ClefRouter, RouteDecision
 from .runtime.events import Cancelled, EventLog
 from .runtime.model_manager import ModelManager
 from .runtime.sysinfo import SysSampler
@@ -65,8 +67,9 @@ class LessonPipeline:
             lesson["metrics"] = events.summary()
             lesson["specialists"] = {"available": specialists(self.cfg, self),
                                      "activated": sorted(set(activated))}
-            (out_dir / "lesson.json").write_text(json.dumps(lesson, ensure_ascii=False, indent=1),
-                                                 encoding="utf-8")
+            tmp = out_dir / "lesson.json.tmp"   # atomic: the API may read lesson.json at any moment
+            tmp.write_text(json.dumps(lesson, ensure_ascii=False, indent=1), encoding="utf-8")
+            tmp.replace(out_dir / "lesson.json")
         return lesson
 
     def _run(self, request: str, out_dir: Path, ev: EventLog, options: dict, lesson: dict,
@@ -78,23 +81,34 @@ class LessonPipeline:
             if forced and forced != "auto":
                 lang = {"lang": forced, "confidence": 1.0, "method": "user"}
             else:
-                lang = detect_language(request)
+                lang = detect_language(request, list(cfg.languages))
             code = lang["lang"]
             info = cfg.language(code)
             st.update(lang=code)
         lesson["language"] = {**lang, "name": info["name"], "native": info["native"]}
 
         # 2. master router -------------------------------------------------------------------
-        with ev.stage("route") as st:
-            decision = self.router.route(request, info["name"], ev, mode=options.get("mode"),
-                                         manual=options.get("gateways"))
-            st.update(selected=decision.selected, cached=decision.cached)
+        try:
+            with ev.stage("route") as st:
+                decision = self.router.route(request, info["name"], ev, mode=options.get("mode"),
+                                             manual=options.get("gateways"))
+                st.update(selected=decision.selected, cached=decision.cached)
+        except Cancelled:
+            raise
+        except Exception as exc:   # a broken router degrades to the minimum lesson instead of failing it
+            self.models.unload(ev)
+            lesson["errors"]["route"] = f"{type(exc).__name__}: {exc}"
+            fallback = list(cfg.get("router.min_gateways", ["notes"])) or ["notes"]
+            decision = RouteDecision(mode="fallback", selected=fallback,
+                                     gateways={g: (1.0 if g in fallback else 0.0) for g in GATEWAYS},
+                                     note="router failed - minimum gateways used")
         lesson["route"] = decision.to_dict()
         if decision.mode == "clef":
             activated.append("router:clef-flash")
         in_min = float(cfg.get("router.in_scope_min", 0) or 0)
         if decision.mode == "clef" and decision.in_scope is not None and decision.in_scope < in_min:
             # conditional computation at its cheapest: no generator, TTS or video is loaded at all
+            self.models.unload(ev)
             lesson["out_of_scope"] = True
             lesson["errors"]["scope"] = (f"This does not look like a request to learn a technical or scientific topic "
                                          f"(router P(in scope) = {decision.in_scope:.2f}). Rephrase it, or pick the "
@@ -106,6 +120,8 @@ class LessonPipeline:
             lesson["errors"]["video"] = "no video engine available (install manim and/or hyperframes)"
             selected.remove("video")
         lesson["video_engine"] = engine
+        if not selected:     # nothing left to generate: do not load the generator at all
+            return
 
         # 3. generator: plan, retrieval, all text artefacts -----------------------------------
         server = self.models.acquire("generator", ev)
@@ -132,6 +148,11 @@ class LessonPipeline:
                 with ev.stage("retrieve") as st:
                     queries = [(q, "en") for q in plan.get("search_queries_en", [])]
                     queries += [(q, code) for q in plan.get("search_queries_native", [])]
+                    if code != "en" and not plan.get("search_queries_native"):
+                        # the learner-language archive needs learner-language words: key terms
+                        # without their "(English)" glosses, then the request itself
+                        terms = [re.sub(r"\s*\([^)]*\)", "", t).strip() for t in plan.get("key_terms", [])]
+                        queries += [(t, code) for t in terms[:3] if t] + [(request[:120], code)]
                     if not queries:
                         queries = [(request, code)]
                     passages = self.kb.search(queries, learner_lang=code, subject=decision.subject, events=ev)
@@ -281,7 +302,8 @@ def write_exports(lesson: dict, out_dir: Path) -> None:
         (out_dir / "notes.md").write_text("\n".join(md), encoding="utf-8")
     cards = (lesson.get("flashcards") or {}).get("cards")
     if cards:
-        clean = lambda s: str(s).replace("\t", " ").replace("\n", "<br>")
+        # Anki fields are HTML: escape the model's text, then add our own line breaks
+        clean = lambda s: html.escape(str(s), quote=False).replace("\t", " ").replace("\n", "<br>")
         (out_dir / "flashcards_anki.tsv").write_text(
             "".join(f"{clean(c['front'])}\t{clean(c['back'])}\n" for c in cards), encoding="utf-8")
     code = lesson.get("code")
