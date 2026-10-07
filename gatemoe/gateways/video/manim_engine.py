@@ -51,6 +51,19 @@ def binary_search_steps(values: list[int], target: int) -> list[dict]:
     return steps
 
 
+def _tidy(x: float) -> int | float:
+    return int(x) if float(x).is_integer() else round(float(x), 3)
+
+
+def _short(text: str, n: int) -> str:
+    """Cut at a word boundary with an ellipsis instead of mid-word."""
+    text = " ".join(str(text).split())
+    if len(text) <= n:
+        return text
+    cut = text[: n - 1].rsplit(" ", 1)[0] if " " in text[: n - 1] else text[: n - 1]
+    return cut.rstrip(" ,;:") + "…"
+
+
 def beat_to_spec(beat: dict, lang: str) -> dict:
     """Map a planner beat (flat schema) onto a Manim template spec."""
     t, title = beat.get("template"), (beat.get("title") or "")[:90]
@@ -67,10 +80,11 @@ def beat_to_spec(beat: dict, lang: str) -> dict:
         if hi <= lo:
             lo, hi = -5.0, 5.0
         spec = {"type": "graph", "title": title, "expr": (beat.get("expression") or "")[:160],
-                "x_range": [lo, hi], "label": (lines[0] if lines else "")[:40]}
+                "x_range": [lo, hi], "label": _short(lines[0] if lines else "", 40)}
     elif t == "array_steps":
-        vals = sorted({int(_num(v, 0)) for v in (beat.get("values") or [])})[:16]
-        target = int(_num(beat.get("target"), vals[len(vals) // 2] if vals else 0))
+        # keep the planner's numbers (3.5 stays 3.5) so the picture matches the narration
+        vals = sorted({_tidy(_num(v, 0)) for v in (beat.get("values") or [])})[:16]
+        target = _tidy(_num(beat.get("target"), vals[len(vals) // 2] if vals else 0))
         spec = {"type": "array_steps", "title": title, "values": vals, "step_seconds": 1.0,
                 "steps": binary_search_steps(vals, target) if vals else []}
     else:  # bullets, definition, or a HyperFrames-only template

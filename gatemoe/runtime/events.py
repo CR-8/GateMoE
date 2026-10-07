@@ -99,10 +99,15 @@ class EventLog:
             subs = list(self._subs)
             self._subs.clear()
         for q in subs:
-            try:
-                q.put_nowait({"kind": "eof"})
-            except queue.Full:
-                pass
+            for _ in range(2):              # a full queue (slow client) must still receive eof
+                try:
+                    q.put_nowait({"kind": "eof"})
+                    break
+                except queue.Full:
+                    try:
+                        q.get_nowait()
+                    except queue.Empty:
+                        pass
 
     # -- summaries --------------------------------------------------------------------------
     def summary(self) -> dict:

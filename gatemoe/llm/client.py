@@ -55,7 +55,8 @@ class Generator:
         last_err: Exception | None = None
         for attempt in range(retries + 1):
             t = time.perf_counter()
-            resp = post_json(self.base_url + "/v1/chat/completions", body, timeout=self.timeout)
+            resp = post_json(self.base_url + "/v1/chat/completions", body, timeout=self.timeout,
+                             cancel_check=self.events.check_cancel if self.events else None)
             secs = time.perf_counter() - t
             choice = (resp.get("choices") or [{}])[0]
             content = (choice.get("message") or {}).get("content") or ""
@@ -69,6 +70,7 @@ class Generator:
                     predicted_n=timings.get("predicted_n", usage.get("completion_tokens")),
                     prompt_tps=round(timings.get("prompt_per_second", 0) or 0, 2),
                     gen_tps=round(timings.get("predicted_per_second", 0) or 0, 2),
+                    draft_n=timings.get("draft_n"), draft_accepted=timings.get("draft_n_accepted"),
                     finish=choice.get("finish_reason"))
             try:
                 obj = _extract_json(content)

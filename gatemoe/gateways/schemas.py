@@ -37,11 +37,11 @@ def _obj(props: dict, required: list[str] | None = None) -> dict:
             "required": list(props) if required is None else required, "additionalProperties": False}
 
 
-def plan_schema() -> dict:
+def plan_schema(english: bool = True) -> dict:
     return _obj({
         "title": _str(100),
         "search_queries_en": _arr(_str(60), 1, 3),
-        "search_queries_native": _arr(_str(60), 0, 2),
+        "search_queries_native": _arr(_str(60), 0 if english else 1, 2),   # learner-language ZIM search
         "key_terms": _arr(_str(40), 2, 6),
     })
 

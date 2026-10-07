@@ -41,7 +41,7 @@ def cfg(tmp_path: Path, fake_server_exe: Path):
         "llama": {"ready_timeout_s": 20, "stop_timeout_s": 5},
         "models": {"router": {"file": "router.gguf", "port": free_port()},
                    "generator": {"file": "gen.gguf", "port": free_port()}},
-        "server": {"sys_interval_s": 0.5},
+        "server": {"sys_interval_s": 0.5, "allowed_hosts": ["testserver"]},
     })
     c.ensure_dirs()
     return c

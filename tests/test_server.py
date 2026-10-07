@@ -90,3 +90,35 @@ def test_restart_marks_running_jobs_interrupted(cfg):
     again = JobManager(cfg, lambda: pipe)      # simulates a server restart mid-job
     assert again.get(job.id).status == "interrupted"
     pipe.gate.set()
+
+
+def test_host_check_and_limits(cfg):
+    from gatemoe.server.app import host_allowed
+    assert host_allowed("192.168.1.20:8000", []) and host_allowed("[::1]:8000", []) and host_allowed("pi.local", [])
+    assert not host_allowed("attacker.example:8000", []) and host_allowed("tutor.lan", ["tutor.lan"])
+    pipe = FakePipeline()
+    client = TestClient(create_app(cfg, JobManager(cfg, lambda: pipe)))
+    assert client.get("/api/config", headers={"host": "evil.example"}).status_code == 403
+    assert client.post("/api/lessons", json={"request": "   "}).status_code == 400
+    assert client.post("/api/lessons", json={"request": "x", "gateways": ["notes"] * 50}).status_code == 422
+    pipe.gate.set()
+
+
+def test_cancel_queued_job_ends_its_stream(cfg):
+    pipe = FakePipeline()
+    jobs = JobManager(cfg, lambda: pipe)
+    first = jobs.submit("Explain diodes")
+    second = jobs.submit("Explain capacitors")           # waits behind the first
+    log = jobs.events(second.id)
+    q = log.subscribe()
+    jobs.cancel(second.id)
+    kinds = []
+    while not q.empty():
+        kinds.append(q.get_nowait()["kind"])
+    assert jobs.get(second.id).status == "cancelled" and kinds[-2:] == ["job_end", "eof"] and log.closed
+    assert jobs.events(second.id) is None                # history now replays from events.jsonl
+    pipe.gate.set()
+    wait = time.time()
+    while jobs.get(first.id).status != "done" and time.time() - wait < 10:
+        time.sleep(0.05)
+    assert jobs.get(first.id).status == "done"

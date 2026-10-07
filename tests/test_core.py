@@ -124,3 +124,25 @@ def test_router_bypass_modes(cfg):
     r = ClefRouter(cfg, ModelManager(cfg))
     assert r.route("x", "English", mode="all").selected == list(GATEWAYS)
     assert r.route("x", "English", mode="manual", manual=["quiz", "bogus"]).selected == ["quiz"]
+
+
+def test_langid_portuguese_not_forced_to_english():
+    from gatemoe.langid import detect_language
+    langs = ["en", "pt", "es", "de", "kn", "hi"]
+    assert detect_language("Me explique a lei de Ohm com um quiz", langs)["lang"] == "pt"
+    assert detect_language("How does a capacitor work?", langs)["lang"] == "en"
+    assert detect_language("ಓಮ್ ನಿಯಮ", langs)["lang"] == "kn"
+
+
+def test_second_server_on_busy_port_is_refused(cfg):
+
+    from gatemoe.runtime.llama_server import ServerError
+    first = ModelManager(cfg)
+    first.acquire("router")
+    try:
+        other = ModelManager(cfg)._server("router")      # e.g. an orphan of a crashed run holds the port
+        with pytest.raises(ServerError, match="already in use"):
+            other.start()
+        assert first.current.running()                   # the real server is untouched
+    finally:
+        first.unload()

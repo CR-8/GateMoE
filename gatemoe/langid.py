@@ -19,7 +19,10 @@ _SCRIPT_LANG = {
     "THAI": "th", "GREEK": "el", "HEBREW": "he", "ARABIC": "ar",
 }
 _AMBIGUOUS = {"DEVANAGARI": ["hi", "mr"], "CYRILLIC": ["ru", "uk", "bg"], "CJK": ["zh", "ja"]}
-_EN_HINT = re.compile(r"\b(the|what|how|why|explain|learn|teach|about|is|are|of|and|with|me|i|want|make|show)\b", re.I)
+# Words that are English and NOT also common short words in Portuguese/Spanish/Italian/Catalan
+# ("me", "i", "a" were removed: "Me explique a lei de Ohm" is Portuguese).
+_EN_HINT = re.compile(r"\b(the|what|how|why|explain|learn|teach|about|is|are|of|and|with|want|make|show|please|"
+                      r"tell|works?|does|do)\b", re.I)
 
 
 def _script_of(ch: str) -> str | None:
@@ -77,6 +80,7 @@ def detect_language(text: str, supported: list[str] | None = None) -> dict:
     prob = float(prob)
     if script == "LATIN" and "en" in supported and lang != "en":
         words = len(text.split())
-        if (prob < 0.9 and _EN_HINT.search(text)) or (words <= 3 and prob < 0.6):
+        hints = {m.lower() for m in _EN_HINT.findall(text)}
+        if (prob < 0.9 and len(hints) >= 2) or (words <= 3 and prob < 0.6):
             return {"lang": "en", "confidence": round(prob, 3), "method": "latin-short-default"}
     return {"lang": lang, "confidence": round(prob, 3), "method": "py3langid"}

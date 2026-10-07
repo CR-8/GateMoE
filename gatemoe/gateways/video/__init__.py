@@ -7,6 +7,8 @@ then to the other engine, so one bad beat never sinks the video.
 """
 from __future__ import annotations
 
+import shutil
+
 import re
 import time
 from pathlib import Path
@@ -125,8 +127,6 @@ class VideoGateway:
 
     def render(self, plan: dict, narration: list[dict] | None, lang: str, engine: str, out_dir: Path,
                events: EventLog | None = None) -> dict:
-        import shutil
-
         beats = plan.get("beats") or []
         if not beats:
             raise ValueError("video plan has no beats")
@@ -138,10 +138,20 @@ class VideoGateway:
         others = [e for e in avail if e != engine]
         work = out_dir / "video_work"
         work.mkdir(parents=True, exist_ok=True)
+        try:
+            return self._render(plan, beats, narration, lang, engine, others, work, out_dir, events)
+        finally:   # success or failure: beat clips are scratch; narration WAVs are muxed or useless
+            shutil.rmtree(work, ignore_errors=True)
+            voiced = [n["wav"] for n in narration or [] if n.get("wav")]
+            if voiced:
+                shutil.rmtree(Path(voiced[0]).parent, ignore_errors=True)
+
+    def _render(self, plan: dict, beats: list, narration: list[dict] | None, lang: str, engine: str,
+                others: list[str], work: Path, out_dir: Path, events: EventLog | None) -> dict:
         tail, fps = float(self.cfg["video.tail_pad_s"]), int(self.cfg["video.fps"])
         pending, wavs = [], {}
         for i, beat in enumerate(beats):
-            if narration and i < len(narration):
+            if narration and i < len(narration) and narration[i].get("wav"):
                 wavs[i], d = narration[i]["wav"], narration[i]["duration_s"] + tail
             else:  # no voice: give the viewer time to read the caption
                 wavs[i], d = None, max(3.0, len(beat.get("narration") or "") / 14.0)
@@ -187,9 +197,6 @@ class VideoGateway:
         final = out_dir / "video.mp4"
         assemble(clips, durs, wav_list, final, self.cfg["paths.ffmpeg"])
         write_subtitles(texts, durs, out_dir / "video.vtt", out_dir / "video.srt")
-        shutil.rmtree(work, ignore_errors=True)
-        if narration:
-            shutil.rmtree(Path(narration[0]["wav"]).parent, ignore_errors=True)   # muxed into video.mp4
         return {"video": "video.mp4", "subtitles": "video.vtt", "srt": "video.srt",
                 "duration_s": round(sum(durs), 2), "engine": engine, "render_s": round(time.perf_counter() - t0, 2),
                 "beats": report}

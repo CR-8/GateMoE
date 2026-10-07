@@ -76,7 +76,7 @@ def cmd_route(args, cfg) -> int:
     ev = EventLog(None)
     try:
         for text in args.requests:
-            lang = detect_language(text)
+            lang = detect_language(text, list(cfg.languages))
             dec = router.route(text, cfg.language(lang["lang"])["name"], ev)
             print(json.dumps({"request": text, "language": lang, **dec.to_dict()}, ensure_ascii=False, indent=1))
     finally:
@@ -94,7 +94,7 @@ def cmd_serve(args, cfg) -> int:
 
     app = create_app(cfg)
     uvicorn.run(app, host=args.host or cfg["server.host"], port=args.port or int(cfg["server.port"]),
-                log_level="info")
+                log_level="info", timeout_graceful_shutdown=5)   # open SSE streams must not block shutdown
     return 0
 
 
