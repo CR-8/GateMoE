@@ -9,7 +9,7 @@ account). It is updated with every commit that changes the plan. Read it with
 Working end to end on x86 with the real models (Clef-flash router, Qwen3.5-4B generator):
 router -> plan -> Kiwix retrieval -> notes / flashcards / quiz / code / podcast script / video plan
 -> Supertonic or MMS speech -> Manim or HyperFrames video -> Typst handout, plus Graphviz concept
-maps and PhET simulations served from ZIM files. Web UI (phone-friendly) and CLI. 48 model-free tests.
+maps and PhET simulations served from ZIM files. Web UI (phone-friendly) and CLI. 47 model-free tests.
 
 Measured on a 2-thread x86 container (not a Pi): English lesson ~19 min, Kannada ~26 min; the router
 call is ~60 s (930 prompt tokens, no prefix cache possible); the generator runs at ~3.5 tok/s, so text
