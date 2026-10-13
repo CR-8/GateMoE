@@ -1,4 +1,4 @@
-"""Command line: ``gatemoe serve | lesson | route | doctor | catalog | swapbench``."""
+"""Command line: ``gatemoe serve | lesson | route | doctor | catalog | swapbench | kdd``."""
 from __future__ import annotations
 
 import argparse
@@ -134,6 +134,44 @@ def cmd_swapbench(args, cfg) -> int:
     return 0
 
 
+def cmd_kdd(args, cfg) -> int:
+    """Knowledge discovery for knowledge updates: snapshot layer (Kiwix) + delta layer (new knowledge)."""
+    from .knowledge import kdd
+
+    cfg.ensure_dirs()
+    if args.action == "gaps":
+        return kdd.cmd_gaps(cfg, args.dirs, args.json)
+    if args.action == "snapshots":
+        return kdd.cmd_update(cfg, apply=args.apply, add=args.add)
+    from .knowledge.delta import DeltaKDD, fetch_arxiv, read_inbox
+
+    d = DeltaKDD(cfg)
+    if args.action in ("ingest", "run"):
+        docs = []
+        if not args.no_arxiv:
+            docs += fetch_arxiv(args.categories.split(",") if args.categories else list(cfg["kdd.arxiv_categories"]),
+                                int(args.per_category or cfg["kdd.arxiv_per_category"]))
+        inbox = Path(args.inbox) if args.inbox else cfg.path("kdd.inbox_dir")
+        docs += read_inbox(inbox)
+        demand = {}
+        if args.dirs or cfg.path("paths.jobs_dir").exists():    # usage-driven priority: weak language/subject cells
+            mined = kdd.mine(kdd.records_from_lessons([Path(x) for x in args.dirs] or [cfg.path("paths.jobs_dir")]))
+            demand = {f"{c['lang']}/{c['subject']}": c["weak_share"] for c in mined["cells"]}
+        rep = d.ingest(docs, demand=demand)
+        print(json.dumps({k: v for k, v in rep.items() if k != "decisions"}, indent=1, default=str))
+        if args.action == "run":
+            print(json.dumps(d.build(), indent=1))
+        return 0
+    if args.action == "build":
+        print(json.dumps(d.build(), indent=1))
+    elif args.action == "prune":
+        print(json.dumps(d.prune(), indent=1))
+        print(json.dumps(d.build(), indent=1))
+    else:
+        print(json.dumps(d.status(), indent=1))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="gatemoe", description=__doc__)
     p.add_argument("--config", help="YAML file merged over the defaults (or set GATEMOE_CONFIG)")
@@ -160,10 +198,22 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--roles", default="router,generator")
     s.add_argument("--repeats", type=int, default=3)
 
+    s = sub.add_parser("kdd", help="knowledge updates: gaps, snapshots, ingest/build/prune the delta, status")
+    s.add_argument("action", choices=["gaps", "snapshots", "ingest", "build", "run", "prune", "status"])
+    s.add_argument("dirs", nargs="*", help="gaps/ingest: folders with lesson.json files (default: jobs_dir)")
+    s.add_argument("--json", action="store_true", help="gaps: machine-readable output")
+    s.add_argument("--apply", action="store_true", help="snapshots: download, verify and swap in newer snapshots")
+    s.add_argument("--add", nargs="*", help="snapshots: archive prefixes to add, e.g. libretexts.org_en_bio")
+    s.add_argument("--no-arxiv", action="store_true", help="ingest/run: inbox only")
+    s.add_argument("--categories", help="ingest/run: arXiv categories, e.g. cs.RO,eess.SY")
+    s.add_argument("--per-category", type=int)
+    s.add_argument("--inbox", help="ingest/run: folder of .pdf/.html/.md/.txt (default kdd.inbox_dir)")
+
     args = p.parse_args(argv)
     cfg = load_config(args.config)
     return {"serve": cmd_serve, "lesson": cmd_lesson, "route": cmd_route, "catalog": cmd_catalog,
-            "doctor": cmd_doctor, "swapbench": cmd_swapbench}[args.cmd](args, cfg)
+            "doctor": cmd_doctor, "swapbench": cmd_swapbench,
+            "kdd": cmd_kdd}[args.cmd](args, cfg)
 
 
 if __name__ == "__main__":

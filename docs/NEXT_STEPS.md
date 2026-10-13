@@ -36,6 +36,14 @@ hardware: {threads: 4}
 
 and run `GATEMOE_CONFIG=that.yaml gatemoe lesson "Explain Ohm's law with a quiz" --language en`.
 
+## Paper 1 (13 Oct 2026)
+
+The measurement campaign for the first paper is in `research/paper1/` and documented in
+[PAPER1_EXPERIMENT.md](PAPER1_EXPERIMENT.md): one 8 GB Google Cloud VM, ~1 week, ALL / CLEF / ORACLE
+end-to-end arms, router quality on 201 labelled EN/HI/Hinglish/KN requests, serving + capacity, grounding,
+and the new KDD knowledge layers (`gatemoe kdd ...`: Kiwix snapshot refresh + a delta archive of new
+research). Status: built and tested against the fake server; waiting for the cloud run.
+
 ## Open work, in priority order
 
 ### A. Review findings

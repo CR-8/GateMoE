@@ -84,6 +84,19 @@ knowledge:
   passage_words: 200
   max_source_chars: 6000   # hard cap on SOURCES text (keeps Pi prefill time bounded)
   include_english: true    # also search English ZIMs for non-English requests
+  delta: true              # also search the KDD delta archives (gatemoe_delta_<lang>_*.zim, see `gatemoe kdd`)
+
+# Knowledge updates (KDD). Snapshot layer = Kiwix archives (refresh: `gatemoe kdd snapshots --apply`);
+# delta layer = new knowledge between snapshots (`gatemoe kdd run` -> gatemoe_delta_<lang>_<YYYY-MM>.zim).
+kdd:
+  store_dir: ${paths.data_dir}/kdd          # accepted documents (JSONL per language) + run reports
+  inbox_dir: ${paths.data_dir}/kdd/inbox    # staff drop papers, lab manuals, notes here (.pdf .html .md .txt)
+  arxiv_categories: [cs.AI, cs.LG, cs.RO, eess.SP, eess.SY, physics.app-ph, physics.ed-ph, q-bio.BM, physics.geo-ph, math.NA]
+  arxiv_per_category: 25
+  min_words: 40
+  novelty_min: 0.5          # 1 - containment in the best snapshot passage; lower = already covered, rejected
+  near_duplicate_jaccard: 0.8
+  max_age_days: 365         # delta documents older than this leave at the next build
 
 simulations:               # PhET interactive simulations from phet_<lang>_all ZIMs (title matching, no LLM)
   enabled: true

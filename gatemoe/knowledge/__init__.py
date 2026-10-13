@@ -30,6 +30,11 @@ SUBJECT_HINTS = {
 }
 
 
+def is_delta(name: str) -> bool:
+    """Archives compiled by the KDD pipeline (gatemoe/knowledge/kdd.py) from new knowledge."""
+    return name.lower().startswith("gatemoe_delta")
+
+
 def zim_kind(name: str) -> str:
     """'simulations' for PhET archives (interactive apps, not text to retrieve), else 'text'."""
     return "simulations" if name.lower().startswith("phet") else "text"
@@ -175,11 +180,15 @@ class KnowledgeBase:
             return not hints or any(h in name for h in hints) or not any(h in name for h in all_hints)
 
         chosen = []
+        use_delta = bool(self.cfg.get("knowledge.delta", True))
         for lg in langs:
             zims = [z for z in self.catalog()
-                    if z.get("lang") == lg and "error" not in z and z.get("kind") == "text" and fits(z["name"])]
+                    if z.get("lang") == lg and "error" not in z and z.get("kind") == "text" and fits(z["name"])
+                    and not is_delta(z["name"])]
             zims.sort(key=lambda z: (not any(h in z["name"].lower() for h in hints), -z.get("size_mb", 0)))
             chosen += zims[: int(self.cfg.get("knowledge.max_zims_per_language", 3))]
+            if use_delta:   # the KDD delta layer (new knowledge between snapshots) is always searched too
+                chosen += [z for z in self.catalog() if z.get("lang") == lg and "error" not in z and is_delta(z["name"])]
         return chosen
 
     # -- search ------------------------------------------------------------------------------
