@@ -148,7 +148,9 @@ class ModelManager:
             if not self.current:
                 return
             role = self.current.name
+            t = time.perf_counter()
             stats = self.current.stop()
+            stats["seconds"] = round(time.perf_counter() - t, 3)   # unload is part of the swap cost
             self.current = None
             self.history.append({"event": "unload", "role": role, **stats})
             del self.history[:-50]

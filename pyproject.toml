@@ -25,6 +25,7 @@ dependencies = [
 video = ["manim[typst]>=0.21"]
 speech-extra = ["piper-tts>=1.8", "sherpa-onnx>=1.12", "num2words>=0.5"]
 dev = ["pytest>=8", "httpx>=0.27"]
+kdd = ["pypdf>=4"]                       # PDF text for the KDD inbox (pdftotext also works)
 
 [project.scripts]
 gatemoe = "gatemoe.cli:main"

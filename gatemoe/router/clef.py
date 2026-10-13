@@ -146,15 +146,23 @@ class ClefRouter:
 
     # -- routing ----------------------------------------------------------------------------
     def route(self, text: str, lang_name: str, events: EventLog | None = None,
-              mode: str | None = None, manual: list[str] | None = None) -> RouteDecision:
+              mode: str | None = None, manual: list[str] | None = None,
+              overrides: dict | None = None) -> RouteDecision:
+        """``overrides`` (all/manual modes only): subject / level / video_engine to use instead of the
+        defaults - experiments pass a stored Clef decision so that the arms differ only in which
+        gateways run (research/paper1)."""
         mode = mode or self.cfg["router.mode"]
         if mode in ("all", "manual"):
             selected = list(GATEWAYS) if mode == "all" else [g for g in (manual or []) if g in GATEWAYS]
             if not selected:
                 selected = list(self.cfg.get("router.min_gateways", ["notes"]))
-            return RouteDecision(mode=mode, selected=selected,
-                                 gateways={g: (1.0 if g in selected else 0.0) for g in GATEWAYS},
-                                 note=f"router bypassed ({mode})")
+            dec = RouteDecision(mode=mode, selected=selected,
+                                gateways={g: (1.0 if g in selected else 0.0) for g in GATEWAYS},
+                                note=f"router bypassed ({mode})")
+            for key in ("subject", "level", "video_engine"):
+                if overrides and overrides.get(key):
+                    setattr(dec, key, str(overrides[key]))
+            return dec
         questions = build_questions(self.cfg)
         state = build_state(text, lang_name, int(self.cfg.get("router.max_state_chars", 600)))
         key = self._key(state, questions)

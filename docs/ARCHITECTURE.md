@@ -36,6 +36,16 @@
 Only the selected gateways execute; only the specialists they need are loaded. Every lesson
 records `specialists.available` vs `specialists.activated` and all timings.
 
+## Knowledge layers (KDD)
+
+* **Snapshot layer:** Kiwix ZIM archives, each with its own full-text index. `gatemoe kdd snapshots [--apply]`
+  finds newer Kiwix snapshots, downloads, verifies and swaps them in atomically; `gatemoe kdd gaps` mines the
+  lesson logs for weak language x subject coverage and recommends archives to add.
+* **Delta layer:** new knowledge between snapshots. `gatemoe kdd run` takes the newest arXiv papers and an inbox
+  folder of institute material through selection -> cleaning/dedup -> subject/language tagging -> novelty against
+  the snapshot -> `gatemoe_delta_<lang>_<YYYY-MM>.zim`. The knowledge gateway always searches the delta next to
+  the snapshots (`knowledge.delta`); `gatemoe kdd prune` drops what a newer snapshot has absorbed.
+
 ## Memory plan (8 GB)
 
 * Exactly one llama-server process at a time (`runtime/model_manager.py`): router (≈ 6 GB peak)
@@ -53,7 +63,7 @@ records `specialists.available` vs `specialists.activated` and all timings.
 | `gatemoe/langid.py` | script + py3langid language detection |
 | `gatemoe/llm/` | OpenAI-compatible JSON-schema client (non-thinking), schema validator |
 | `gatemoe/gateways/text.py`, `schemas.py` | prompts + schemas for plan, notes, flashcards, quiz, podcast, code, video plan |
-| `gatemoe/knowledge/` | ZIM catalogue, full-text search, reciprocal-rank fusion, HTML→text (incl. LibreTexts JSON pages), passages, BM25; `phet.py` simulation matching |
+| `gatemoe/knowledge/` | ZIM catalogue, full-text search, reciprocal-rank fusion, HTML→text (incl. LibreTexts JSON pages), passages, BM25; `phet.py` simulation matching; `kdd.py` gap mining + snapshot refresh; `delta.py` KDD delta layer |
 | `gatemoe/gateways/conceptmap.py` | concept links → escaped DOT → sandboxed `dot` (cairo SVG + PNG) |
 | `gatemoe/gateways/speech/` | Supertonic 3, MMS, Piper, sherpa-onnx engines, config plugins (HTTP/command), podcast + narration |
 | `gatemoe/gateways/video/` | Manim templates + batch child process, HyperFrames templates + fallback renderer, sandbox, FFmpeg assembly, subtitles |

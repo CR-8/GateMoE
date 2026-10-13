@@ -91,7 +91,8 @@ class LessonPipeline:
         try:
             with ev.stage("route") as st:
                 decision = self.router.route(request, info["name"], ev, mode=options.get("mode"),
-                                             manual=options.get("gateways"))
+                                             manual=options.get("gateways"),
+                                             overrides=options.get("route_overrides"))
                 st.update(selected=decision.selected, cached=decision.cached)
         except Cancelled:
             raise

@@ -125,6 +125,9 @@ def test_router_bypass_modes(cfg):
     r = ClefRouter(cfg, ModelManager(cfg))
     assert r.route("x", "English", mode="all").selected == list(GATEWAYS)
     assert r.route("x", "English", mode="manual", manual=["quiz", "bogus"]).selected == ["quiz"]
+    # experiment arms reuse a stored Clef decision's subject / level / engine
+    d = r.route("x", "English", mode="all", overrides={"subject": "physics", "video_engine": "hyperframes"})
+    assert (d.subject, d.level, d.video_engine) == ("physics", "beginner", "hyperframes")
 
 
 def test_langid_portuguese_not_forced_to_english():

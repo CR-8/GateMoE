@@ -61,6 +61,7 @@ starts the web app as a service. Details, instance sizes and access options: [do
 | `gatemoe doctor` | checks models, voices, video engines, ZIMs, fonts, RAM |
 | `gatemoe catalog` | lists offline knowledge archives |
 | `gatemoe swapbench` | measures model load/unload (swap) cost |
+| `gatemoe kdd gaps \| snapshots \| run \| prune \| status` | knowledge updates: usage-gap mining, Kiwix snapshot refresh, KDD delta layer (new research between snapshots) |
 | `python scripts/analyze_jobs.py <jobs_dir>` | theoretical vs realised savings across lessons |
 
 `--mode all` runs every gateway — the baseline for the research comparison.
@@ -74,6 +75,7 @@ starts the web app as a service. Details, instance sizes and access options: [do
 * [docs/CLOUD.md](docs/CLOUD.md) — one-command install on a cloud VM (AWS EC2 sizes, access, operations)
 * [docs/EXTENDING.md](docs/EXTENDING.md) — plug in more voices (Fish Audio, Kokoro, …), video templates, ZIMs, languages
 * [docs/NEXT_STEPS.md](docs/NEXT_STEPS.md) — handover: current state, how to set up a session, prioritised open work
+* [docs/PAPER1_EXPERIMENT.md](docs/PAPER1_EXPERIMENT.md) — the one-week Google Cloud measurement campaign for paper 1 (runbook, metrics, KDD knowledge layers)
 * [research/](research/) — the multi-agent research/verification workflows, raw reports and the Clef CPU benchmark
 
 ## What is (and is not) claimed
