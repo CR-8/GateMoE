@@ -218,10 +218,76 @@ def disk_free_gb(path: Path) -> float:
     return round(shutil.disk_usage(p).free / 2**30, 2)
 
 
+def cgroup_dir() -> Path | None:
+    """This process's cgroup v2 folder (the systemd unit confines the campaign to a memory/CPU budget)."""
+    try:
+        for line in Path("/proc/self/cgroup").read_text().splitlines():
+            if line.startswith("0::"):
+                d = Path("/sys/fs/cgroup") / line[3:].lstrip("/")
+                return d if d.exists() else None
+    except OSError:
+        pass
+    return None
+
+
+def _cg_read(name: str) -> str | None:
+    d = cgroup_dir()
+    try:
+        return (d / name).read_text().strip() if d else None
+    except OSError:
+        return None
+
+
+def cgroup_info() -> dict:
+    mx = _cg_read("memory.max")
+    ev = dict(line.split() for line in (_cg_read("memory.events") or "").splitlines() if " " in line)
+    cur = _cg_read("memory.current")
+    try:
+        cpus = sorted(os.sched_getaffinity(0))
+    except AttributeError:
+        cpus = None
+    return {"path": str(cgroup_dir()), "memory_max_mb": round(int(mx) / 2**20) if mx and mx.isdigit() else mx,
+            "swap_max": _cg_read("memory.swap.max"),
+            "memory_current_mb": round(int(cur) / 2**20) if cur and cur.isdigit() else None,
+            "oom_kills": int(ev.get("oom_kill", 0)), "cpus": cpus}
+
+
+class CgroupPeak:
+    """Peak memory.current of the campaign's cgroup while a block runs (RSS + page cache inside the budget)."""
+
+    def __init__(self, interval: float = 1.0):
+        self.interval, self.peak, self._stop = interval, 0, None
+
+    def __enter__(self):
+        import threading
+
+        self._stop = threading.Event()
+
+        def run():
+            while not self._stop.is_set():
+                v = _cg_read("memory.current")
+                if v and v.isdigit():
+                    self.peak = max(self.peak, int(v))
+                self._stop.wait(self.interval)
+
+        self.oom0 = cgroup_info()["oom_kills"]
+        self._t = threading.Thread(target=run, daemon=True)
+        self._t.start()
+        return self
+
+    def __exit__(self, *exc):
+        self._stop.set()
+        self._t.join(timeout=5)
+        self.result = {"cgroup_peak_mb": round(self.peak / 2**20) if self.peak else None,
+                       "cgroup_oom_kills": cgroup_info()["oom_kills"] - self.oom0}
+
+
 def mem_snapshot() -> dict:
     m = meminfo_mb()
+    cur = _cg_read("memory.current")
     return {"mem_available_mb": round(m.get("MemAvailable", 0)), "cached_mb": round(m.get("Cached", 0)),
-            "swap_used_mb": round(m.get("SwapTotal", 0) - m.get("SwapFree", 0))}
+            "swap_used_mb": round(m.get("SwapTotal", 0) - m.get("SwapFree", 0)),
+            "cgroup_current_mb": round(int(cur) / 2**20) if cur and cur.isdigit() else None}
 
 
 def cpu_model() -> str:
@@ -287,7 +353,7 @@ class EnvPhase(Phase):
                      "threads": cfg["hardware.threads"], "python": sys.version.split()[0],
                      "meminfo_mb": {k: round(v) for k, v in meminfo_mb().items()
                                     if k in ("MemTotal", "MemAvailable", "SwapTotal")},
-                     "disk_free_gb": disk_free_gb(cfg.path("paths.data_dir"))}
+                     "disk_free_gb": disk_free_gb(cfg.path("paths.data_dir")), "cgroup": cgroup_info()}
         try:
             env["os_release"] = dict(line.split("=", 1) for line in Path("/etc/os-release").read_text().splitlines()
                                      if "=" in line)
@@ -380,7 +446,8 @@ class SwapPhase(Phase):
                     evict(files.values())
                 before = {"resident_mb": residency_mb(files[role]), **mem_snapshot()}
                 s0, t = proc_stat(), time.perf_counter()
-                mm.acquire(role, ev)
+                with CgroupPeak(0.5) as cgp:
+                    mm.acquire(role, ev)
                 load_s = time.perf_counter() - t
                 s1 = proc_stat()
                 mm.unload(ev)
@@ -389,7 +456,7 @@ class SwapPhase(Phase):
                 rows.append({"role": role, "condition": cond, "load_s": round(load_s, 3), "size_mb": size_mb,
                              "mb_per_s": round(size_mb / load_s, 1) if load_s else None,
                              "unload_s": un.get("seconds"), "peak_rss_mb": un.get("peak_rss_mb"),
-                             "before": before, **cpu_fractions(s0, s1)})
+                             "before": before, **cpu_fractions(s0, s1), **cgp.result})
                 print(json.dumps(rows[-1]), flush=True)
             write_json(self.result_path(it["uid"]), {"uid": it["uid"], "rep": it["rep"], "time": now(),
                                                      "cpu_model": cpu_model(), "rows": rows})
@@ -632,8 +699,10 @@ def run_lesson(phase: Phase, it: dict) -> None:
     ev = EventLog(out / "events.jsonl")
     s0, t0, started = proc_stat(), time.perf_counter(), now()
     lesson: dict = {}
+    cgp = CgroupPeak()
     try:
-        lesson = pipe.run(req["text"], out, ev, options)
+        with cgp:
+            lesson = pipe.run(req["text"], out, ev, options)
     finally:
         pipe.models.unload(ev)
         ev.close()
@@ -684,7 +753,7 @@ def run_lesson(phase: Phase, it: dict) -> None:
         "knowledge_enabled": bool(cfg["knowledge.enabled"]),
         "delta_enabled": bool(cfg.get("knowledge.delta", True)),
         "sources": [{k: s.get(k) for k in ("title", "zim", "lang")} for s in lesson.get("sources") or []],
-        "media_manifest": manifest, "media_kept": keep,
+        "media_manifest": manifest, "media_kept": keep, **getattr(cgp, "result", {}),
         "counts": {"flashcards": len((lesson.get("flashcards") or {}).get("cards") or []),
                    "quiz": len((lesson.get("quiz") or {}).get("questions") or []),
                    "podcast_turns": len((lesson.get("podcast") or {}).get("turns") or []),
@@ -1115,6 +1184,8 @@ def run_batch(phase: Phase, batch: list[dict], out: Path) -> None:
                 rc = proc.wait()
                 break
     logf.close()
+    if _STOP:                          # systemd signals the whole unit: the worker may have died first
+        reason = "stopped"
     missing = [b for b in batch if not phase.done(b["uid"])]
     if missing:
         kill_stray_servers(phase.cfg)   # a crashed worker can orphan a llama-server (own session)

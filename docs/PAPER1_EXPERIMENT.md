@@ -4,8 +4,15 @@
 institutes - when does model-level conditional computation pay under an 8 GB memory budget?*
 
 Target: an IEEE conference (education technology / edge computing / applied AI track), 6 pages,
-IEEEtran. Everything below runs unattended on **one 8 GB Google Cloud VM** for about a week and ends
+IEEEtran. Everything below runs unattended on **one Google Cloud VM** for about a week and ends
 with one command that packs the results for the write-up.
+
+**The 8 GB budget is real, not assumed.** On an 8 GB VM the whole machine is the budget. On a bigger
+VM, `setup_vm.sh` confines the campaign's systemd service to **8 GB of memory (RSS + page cache,
+cgroup `MemoryMax`, no swap)** and **4 CPUs on 4 different physical cores** (`CPUAffinity`,
+`hardware.threads`), so model loading competes for the same 8 GB of page cache as on the Pi. Every
+item records memory peaks (and, under a cgroup, `cgroup_peak_mb` / `cgroup_oom_kills`); `env.json`
+records the machine type and limits.
 
 ---
 
@@ -62,7 +69,8 @@ knowledge gateway picks a new archive up on its next search. The novelty filter 
 
 ## 3. The campaign (what runs, in order)
 
-Estimated for a 2-vCPU / 8 GB VM (e2-standard-2). `paper1 status` shows real ETAs.
+Estimates below were made for 2 vCPU; more cores make most phases faster.
+`paper1 status` shows real ETAs.
 
 | phase | what | items | est. time |
 |---|---|---|---|
@@ -139,7 +147,9 @@ by itself). Or in Cloud Shell: `gcloud compute disks resize <disk> --size=50GB -
    curl -fsSL https://raw.githubusercontent.com/CR-8/GateMoE/paper1-cloud-experiment/research/paper1/setup_vm.sh | sudo bash
    ```
    On a fresh VM this installs everything first (~30-45 min, Hindi + Kannada included), then starts
-   the campaign as the service `gatemoe-paper1`. Re-running is safe. Leave the VM on all week.
+   the campaign as the service `gatemoe-paper1` within the 8 GB budget. Re-running is safe
+   (it resumes). To throw away results and restart the 7-day clock, run it with `sudo RESET=1 bash`.
+   Leave the VM on all week.
 2. **Optional - your own material in the KDD delta:** copy PDFs / notes / lab manuals into
    `/opt/gatemoe/data/kdd/inbox/` within the first ~4 hours (before p11_kdd starts).
 3. **Once a day:** `paper1 status` (progress, ETA, disk, last failures). `paper1 log` follows the log.
@@ -164,8 +174,12 @@ by itself). Or in Cloud Shell: `gcloud compute disks resize <disk> --size=50GB -
    re-run `paper1 analyze` (it un-blinds with `rating_key.json`). Raters should not see the key.
 7. Afterwards: `sudo systemctl enable --now gatemoe` turns the web app back on.
 
-Cost: an e2-standard-2 runs about $0.07/h -> ≈ $12 for the week plus disk; the scaling test adds
-$2-6. Far inside the remaining credit. **Do not resize the VM's RAM** - 8 GB is the point.
+Cost: an 8 GB e2 VM runs about $0.07-0.10/h -> roughly $12-20 for the week plus disk (a bigger VM
+confined by the service costs more, up to ~$45); the scaling test adds $2-6. Inside the credit.
+
+The scaling test resizes the VM to e2-standard-2 (2 vCPU / 8 GB) for its duration, because the
+free trial allows 8 vCPUs in total and four 2-vCPU nodes use exactly that; `scale_test.sh down`
+restores the original machine type.
 
 Troubleshooting: `paper1 phase-log p4_e2e` shows the current phase's output; a failed item is
 retried once (router items twice) and then skipped (listed under "last failures"); `paper1 restart`

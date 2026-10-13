@@ -188,6 +188,7 @@ def sec_env(res: Path) -> dict:
     out = {k: env.get(k) for k in ("hostname", "cpu_model", "nproc", "threads", "amx", "gcp_machine_type", "gcp_zone",
                                    "gcp_cpu_platform", "gatemoe_rev", "llama_cpp_rev", "disk_free_gb")}
     out["mem_total_mb"] = (env.get("meminfo_mb") or {}).get("MemTotal")
+    out["budget"] = env.get("cgroup")              # memory / CPU budget the campaign was confined to
     out["models"] = env.get("models")
     tps = {}
     for role, b in bench.items():
@@ -214,6 +215,7 @@ def sec_swap(res: Path, figs: Figs) -> dict:
                                      "unload_s_mean": mean([r.get("unload_s") for r in rs]),
                                      "peak_rss_mb": mean([r.get("peak_rss_mb") for r in rs]),
                                      "resident_before_mb": mean([(r.get("before") or {}).get("resident_mb") for r in rs]),
+                                     "budget_peak_mb": mean([r.get("cgroup_peak_mb") for r in rs]),
                                      "size_mb": rs[0].get("size_mb")}
     if figs.plt and out:
         fig, ax = figs.plt.subplots(figsize=(5, 3))
@@ -601,6 +603,8 @@ def sec_e2e(res: Path, reqs: dict, figs: Figs, price: float) -> tuple[dict, dict
                 row[f"min_mem_avail_{name}"] = (r.get("sys") or {}).get("min_mem_available_mb")
                 row[f"max_swap_used_{name}"] = (r.get("sys") or {}).get("max_swap_used_mb")
                 row[f"steal_{name}"] = r.get("steal_frac")
+                row[f"cgroup_peak_{name}"] = r.get("cgroup_peak_mb")
+                row[f"oom_{name}"] = r.get("cgroup_oom_kills")
         if c:
             row["clef_selected"] = c.get("selected")
             row["clef_out_of_scope"] = c.get("out_of_scope")
@@ -727,7 +731,9 @@ def sec_e2e(res: Path, reqs: dict, figs: Figs, price: float) -> tuple[dict, dict
     out["memory"] = {"max_swap_used_mb": max([r.get(f"max_swap_used_{a}") or 0 for r in rows for a in ARMS3] or [0]),
                      "min_mem_available_mb": min([r.get(f"min_mem_avail_{a}") for r in rows for a in ARMS3
                                                   if r.get(f"min_mem_avail_{a}") is not None] or [None]),
-                     "max_peak_rss_mb": max([r.get(f"peak_rss_{a}") or 0 for r in rows for a in ARMS3] or [0])}
+                     "max_peak_rss_mb": max([r.get(f"peak_rss_{a}") or 0 for r in rows for a in ARMS3] or [0]),
+                     "max_budget_peak_mb": max([r.get(f"cgroup_peak_{a}") or 0 for r in rows for a in ARMS3] or [0]),
+                     "oom_kills": sum(r.get(f"oom_{a}") or 0 for r in rows for a in ARMS3)}
     out["steal_frac_mean"] = mean([r.get(f"steal_{a}") for r in rows for a in ARMS3])
     out["error_rate"] = {a: round(statistics.mean([bool(r.get(f"errors_{a}")) for r in rows if r.get(f"T_{a}") is not None]), 4)
                          for a in ARMS3 if any(r.get(f"T_{a}") is not None for r in rows)}
