@@ -46,6 +46,29 @@ if [ "${RESET:-0}" = 1 ] && [ -d "$DATA/paper1" ]; then
   OLD="$DATA/paper1.discarded-$(date +%Y%m%d-%H%M%S)"
   log "RESET: moving earlier results to $OLD and restarting the clock"
   mv "$DATA/paper1" "$OLD"
+  # undo what the earlier run's KDD phase changed, so the knowledge-update study starts again from the
+  # snapshot-only state: delta archives, the delta store, and archives that phase added
+  python3 - "$OLD" "$DATA" <<'PYEOF'
+import json, pathlib, shutil, sys
+old, data = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
+zim = data / "zim"
+for f in zim.glob("gatemoe_delta_*.zim"):
+    f.unlink(); print("removed", f.name)
+for d in ("store", "runs"):
+    shutil.rmtree(data / "kdd" / d, ignore_errors=True)
+try:
+    r = json.loads((old / "p11_kdd" / "items" / "kdd.json").read_text())
+except (OSError, ValueError):
+    r = {}
+before = set(r.get("catalog_before") or [])
+for i in r.get("installed") or []:
+    if i.get("ok") and i.get("archive") and i["archive"] not in before and (zim / i["archive"]).exists():
+        (zim / i["archive"]).unlink(); print("removed", i["archive"], "(added by the earlier KDD phase)")
+for q in zim.glob("*.zim.part"):
+    q.unlink()
+PYEOF
+  rm -f "$DATA"/models/Cloudflare_clef-flash-Q3_K_M.gguf "$DATA"/models/Cloudflare_clef-flash-IQ3_M.gguf \
+        "$DATA"/models/Cloudflare_clef-flash-Q3_K_L.gguf
 fi
 
 if [ "${SKIP_INSTALL:-0}" != 1 ]; then
