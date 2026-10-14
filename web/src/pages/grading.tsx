@@ -331,9 +331,9 @@ export function GradingPage({ assignmentId, sectionId }: { assignmentId?: string
                         {!s ? <Badge variant="gray">Not submitted</Badge> : s.graded ? <Badge variant="green">Reviewed</Badge> : <Badge variant="yellow">Needs review</Badge>}
                       </td>
                       <td className="px-5 py-3 whitespace-nowrap tabular-nums">{s ? `${s.auto} / ${s.max}` : "–"}</td>
-                      <td className="max-w-[260px] px-5 py-3">
+                      <td className="max-w-[200px] px-5 py-3">
                         <div className="flex flex-wrap gap-1">
-                          {fbs.slice(0, 2).map((f) => <Badge key={f.id} variant={f.points < 0 ? "red" : f.points > 0 ? "green" : "gray"} className="max-w-[200px] truncate">{f.text}</Badge>)}
+                          {fbs.slice(0, 2).map((f) => <Badge key={f.id} variant={f.points < 0 ? "red" : f.points > 0 ? "green" : "gray"} className="max-w-[150px] truncate">{f.text}</Badge>)}
                           {fbs.length > 2 && <Badge variant="gray">+{fbs.length - 2}</Badge>}
                         </div>
                       </td>
