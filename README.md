@@ -55,7 +55,7 @@ starts the web app as a service. Details, instance sizes and access options: [do
 
 | Command | What it does |
 |---|---|
-| `gatemoe serve` | web app + job queue (phone-friendly UI with live routing/metrics) |
+| `gatemoe serve` | web app + job queue: teacher console (lesson board, sections, grading with a feedback bank) and a student quiz link, with live routing/metrics |
 | `gatemoe lesson "<request>" [--language kn] [--mode clef\|all\|manual --gateways notes,quiz]` | one lesson from the terminal |
 | `gatemoe route "<request>" ...` | router decision only |
 | `gatemoe doctor` | checks models, voices, video engines, ZIMs, fonts, RAM |
@@ -74,6 +74,7 @@ starts the web app as a service. Details, instance sizes and access options: [do
 * [docs/PI_SETUP.md](docs/PI_SETUP.md) — install, memory settings, troubleshooting
 * [docs/CLOUD.md](docs/CLOUD.md) — one-command install on a cloud VM (AWS EC2 sizes, access, operations)
 * [docs/EXTENDING.md](docs/EXTENDING.md) — plug in more voices (Fish Audio, Kokoro, …), video templates, ZIMs, languages
+* [docs/DESIGN.md](docs/DESIGN.md) — web UI: design tokens, components, screens, how to work on `web/`
 * [docs/NEXT_STEPS.md](docs/NEXT_STEPS.md) — handover: current state, how to set up a session, prioritised open work
 * [docs/PAPER1_EXPERIMENT.md](docs/PAPER1_EXPERIMENT.md) — the one-week Google Cloud measurement campaign for paper 1 (runbook, metrics, KDD knowledge layers)
 * [research/](research/) — the multi-agent research/verification workflows, raw reports and the Clef CPU benchmark
@@ -92,6 +93,10 @@ conditional activation actually saves time there. See [docs/RESEARCH_FINDINGS.md
 python3 -m venv .venv && . .venv/bin/activate
 pip install -e ".[dev]"
 pytest                      # model-free tests (a fake llama-server stands in for the models)
+
+# web UI (React + Tailwind in web/, built into gatemoe/server/static - the build is committed)
+python scripts/demo_ui.py --port 8000 &    # sample data, no models
+cd web && npm install && npm run dev       # http://localhost:5173 ; npm run build when done
 ```
 
 On an x86 dev machine with AMX, add `llama: {extra_args: ["-nr"]}` to your config (llama.cpp

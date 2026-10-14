@@ -69,9 +69,11 @@ records `specialists.available` vs `specialists.activated` and all timings.
 | `gatemoe/gateways/video/` | Manim templates + batch child process, HyperFrames templates + fallback renderer, sandbox, FFmpeg assembly, subtitles |
 | `gatemoe/gateways/handout.py` | Typst PDF handout (notes, glossary, cut-out flashcards, quiz + answer key) |
 | `gatemoe/pipeline.py` | the lesson pipeline (stages above) |
-| `gatemoe/jobs.py`, `gatemoe/server/` | job queue, REST + SSE API, web UI |
+| `gatemoe/jobs.py`, `gatemoe/server/` | job queue, REST + SSE API; serves the built web UI from `server/static` |
+| `gatemoe/classroom.py` | roster, sections (archive/restore), posting a lesson to several sections, feedback bank with grade points, auto-marked quiz submissions (one JSON file) |
+| `web/` | teacher console + student quiz view (React 19, Tailwind v4, Radix); see [DESIGN.md](DESIGN.md) |
 | `gatemoe/cli.py` | `serve`, `lesson`, `route`, `catalog`, `doctor`, `swapbench` |
-| `scripts/` | Pi install, offline asset download, log analysis |
+| `scripts/` | Pi install, offline asset download, log analysis, `demo_ui.py` (UI on sample data) |
 
 ## Safety
 

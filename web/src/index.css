@@ -1,0 +1,139 @@
+@import "tailwindcss";
+@import "@fontsource-variable/inter";
+
+/* ---------------------------------------------------------------------------------------------
+   GateMoE design system - "Google for Education" reference (docs/DESIGN.md):
+   near-white canvas, charcoal ink, one blue accent for interaction, green only for success,
+   pill controls, 24-28px card radii, hairline borders instead of shadows.
+   Google Sans is not redistributable: Inter (bundled, offline) is the documented substitute.
+   --------------------------------------------------------------------------------------------- */
+@theme {
+  /* Colors */
+  --color-canvas-white: #f8f9fa;
+  --color-charcoal-ink: #202124;
+  --color-graphite: #3c4043;
+  --color-slate: #5f6368;
+  --color-mist: #dadce0;
+  --color-cloud-shadow: #c4c6c7;
+  --color-google-blue: #1a73e8;
+  --color-google-blue-deep: #1967d2;
+  --color-classroom-green: #188038;
+  --color-panel-tint: #e8f0fe;
+  --color-green-tint: #e6f4ea;
+  --color-yellow-tint: #fef7e0;
+  --color-red-tint: #fce8e6;
+  --color-purple-tint: #f3e8fd;
+  --color-danger: #d93025;
+
+  /* Typography */
+  --font-google-sans-display: 'Google Sans Display', 'Inter Variable', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+  --font-google-sans-text: 'Google Sans Text', 'Inter Variable', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+  --font-sans: var(--font-google-sans-text);
+  --font-display: var(--font-google-sans-display);
+  --font-mono: ui-monospace, "Noto Sans Mono", SFMono-Regular, Menlo, monospace;
+
+  /* Typography - Scale */
+  --text-caption: 12px;
+  --text-caption--line-height: 1.5;
+  --text-caption--letter-spacing: 0.432px;
+  --text-body-sm: 14px;
+  --text-body-sm--line-height: 1.5;
+  --text-body-sm--letter-spacing: 0.238px;
+  --text-body: 16px;
+  --text-body--line-height: 1.56;
+  --text-body--letter-spacing: 0.272px;
+  --text-subheading: 18px;
+  --text-subheading--line-height: 1.67;
+  --text-subheading--letter-spacing: 0.108px;
+  --text-heading-sm: 22px;
+  --text-heading-sm--line-height: 1.29;
+  --text-heading-sm--letter-spacing: -0.132px;
+  --text-heading: 28px;
+  --text-heading--line-height: 1.2;
+  --text-heading--letter-spacing: -0.168px;
+  --text-heading-lg: 48px;
+  --text-heading-lg--line-height: 1.15;
+  --text-heading-lg--letter-spacing: -0.288px;
+  --text-display: 80px;
+  --text-display--line-height: 1.09;
+  --text-display--letter-spacing: -0.8px;
+
+  /* Spacing steps from the design system, in px. NOTE: they replace Tailwind's numeric utilities for
+     these numbers only: p-8 = 8px, size-32 = 32px, gap-24 = 24px. Every other number keeps Tailwind's
+     4px scale (p-4 = 16px, h-9 = 36px). Use an arbitrary value (h-[192px]) when neither fits. */
+  --spacing-8: 8px;
+  --spacing-16: 16px;
+  --spacing-24: 24px;
+  --spacing-32: 32px;
+  --spacing-40: 40px;
+  --spacing-48: 48px;
+  --spacing-80: 80px;
+  --spacing-88: 88px;
+  --spacing-120: 120px;
+  --spacing-216: 216px;
+
+  /* Border Radius */
+  --radius-md: 4px;
+  --radius-lg: 8px;
+  --radius-2xl: 16px;
+  --radius-2xl-2: 20px;
+  --radius-3xl: 24px;
+  --radius-3xl-2: 28px;
+  --radius-full: 200px;
+  --radius-full-2: 300px;
+}
+
+/* shadcn/ui semantic tokens, mapped onto the design system */
+@theme inline {
+  --color-background: var(--color-canvas-white);
+  --color-foreground: var(--color-charcoal-ink);
+  --color-card: #ffffff;
+  --color-card-foreground: var(--color-charcoal-ink);
+  --color-popover: #ffffff;
+  --color-popover-foreground: var(--color-charcoal-ink);
+  --color-primary: var(--color-google-blue);
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #f1f3f4;
+  --color-secondary-foreground: var(--color-charcoal-ink);
+  --color-muted: #f1f3f4;
+  --color-muted-foreground: var(--color-slate);
+  --color-accent: var(--color-panel-tint);
+  --color-accent-foreground: var(--color-google-blue-deep);
+  --color-destructive: var(--color-danger);
+  --color-border: var(--color-mist);
+  --color-input: var(--color-mist);
+  --color-ring: var(--color-google-blue);
+}
+
+@layer base {
+  * { border-color: var(--color-border); }
+  html, body, #root { height: 100%; }
+  body {
+    background: var(--color-canvas-white);
+    color: var(--color-charcoal-ink);
+    font-family: var(--font-google-sans-text);
+    font-size: var(--text-body-sm);
+    letter-spacing: 0.238px;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, .font-display { font-family: var(--font-google-sans-display); font-weight: 500; }
+  :focus-visible { outline: 2px solid var(--color-google-blue); outline-offset: 2px; }
+  ::selection { background: var(--color-panel-tint); }
+}
+
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-mist) transparent;
+}
+
+/* flip cards (flashcards) */
+.flip { perspective: 1200px; }
+.flip-inner { transition: transform 0.5s cubic-bezier(.2,.7,.2,1); transform-style: preserve-3d; }
+.flip[data-flipped="true"] .flip-inner { transform: rotateY(180deg); }
+.flip-face { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.flip-back { transform: rotateY(180deg); }
+
+/* react-pdf layers */
+.react-pdf__Page { position: relative; }
+.react-pdf__Page__canvas { margin: 0 auto; border-radius: 8px; }
+.react-pdf__Page__textContent, .react-pdf__Page__annotations { display: none; }

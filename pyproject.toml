@@ -34,7 +34,7 @@ gatemoe = "gatemoe.cli:main"
 include = ["gatemoe*"]
 
 [tool.setuptools.package-data]
-gatemoe = ["server/static/*", "config/*.yaml", "gateways/handout_template.typ",
+gatemoe = ["server/static/*", "server/static/assets/*", "config/*.yaml", "gateways/handout_template.typ",
            "gateways/video/hf_fallback_render.mjs", "gateways/video/hf_templates/*.html",
            "gateways/video/hf_templates/assets/*"]
 

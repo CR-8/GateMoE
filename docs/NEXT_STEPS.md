@@ -44,6 +44,19 @@ end-to-end arms, router quality on 201 labelled EN/HI/Hinglish/KN requests, serv
 and the new KDD knowledge layers (`gatemoe kdd ...`: Kiwix snapshot refresh + a delta archive of new
 research). Status: built and tested against the fake server; waiting for the cloud run.
 
+## Web UI + video design (15 Oct 2026, branch `ui-classroom-redesign`)
+
+* New teacher console in `web/` (design tokens, components and screens: [DESIGN.md](DESIGN.md)): lesson
+  board with Kanban, lesson pages with every artefact, sections, grading with a feedback bank whose
+  points adjust auto-marked quiz grades, a student quiz link (`#/take/<post>`), knowledge and system pages.
+  Backend: `gatemoe/classroom.py` + `/api/classroom`, `/api/sections`, `/api/assignments`, `/api/feedback`,
+  `/api/submissions`, `/api/assignments/<id>/take`, `/api/knowledge`; `GET /api/lessons` now returns summaries.
+* Video: both engines share the light design system, a footer (lesson title, scene n/N, progress) and
+  HyperFrames twins of the Manim-only scenes (graph, math, binary-search steps).
+* Merge into `main` after the paper-1 campaign has finished: do not re-run setup on the campaign VM before.
+* Not yet: accounts/roles (a node is a trusted LAN appliance), editing generated content in the UI,
+  exporting grades as CSV.
+
 ## Open work, in priority order
 
 ### A. Review findings
