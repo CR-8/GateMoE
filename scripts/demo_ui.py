@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -283,6 +284,8 @@ def main() -> int:
     ap.add_argument("--data", default="/tmp/gatemoe-demo")
     ap.add_argument("--video", help="an MP4 rendered earlier (its .vtt/.srt next to it are copied too)")
     ap.add_argument("--no-live", action="store_true", help="do not start the slow 'generating' job")
+    ap.add_argument("--allowed-host", action="append", default=[],
+                    help="extra Host name the browser uses, e.g. a Cloud Shell web-preview domain ('*' = any)")
     args = ap.parse_args()
 
     import uvicorn
@@ -291,10 +294,19 @@ def main() -> int:
     from gatemoe.jobs import JobManager
     from gatemoe.server.app import create_app
 
-    data = Path(args.data)
+    data = Path(args.data).resolve()
+    marker = data / ".gatemoe-demo"
+    if data.exists() and any(data.iterdir()) and not marker.exists():   # never wipe a real node's data
+        sys.exit(f"{data} is not empty and was not made by this script; choose another --data folder")
     if data.exists():
         shutil.rmtree(data)
-    cfg = load_config(overrides={"paths": {"data_dir": str(data)}, "server": {"auth": {"password": ""}}})
+    data.mkdir(parents=True)
+    marker.write_text("sample data from scripts/demo_ui.py; safe to delete\n")
+    os.environ.pop("GATEMOE_CONFIG", None)        # a node's own config must not leak in (paths, ports)
+    paths = {k: str(data / v) for k, v in (("jobs_dir", "jobs"), ("cache_dir", "cache"), ("models_dir", "models"),
+                                             ("zim_dir", "zim"))}
+    cfg = load_config(overrides={"paths": {"data_dir": str(data), **paths},
+                                 "server": {"auth": {"password": ""}, "allowed_hosts": args.allowed_host}})
     cfg.ensure_dirs()
     jobs_dir = cfg.path("paths.jobs_dir")
     video = Path(args.video) if args.video else None
