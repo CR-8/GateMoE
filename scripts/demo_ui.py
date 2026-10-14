@@ -349,7 +349,7 @@ def main() -> int:
         jobs.submit("Explain chemical bonding (ionic and covalent) for class 9 with a quiz and a podcast", {"language": "auto"})
         jobs.submit("Newton's laws of motion: flashcards and a short video", {"language": "auto"})
     app = create_app(cfg, jobs)
-    print(f"GateMoE demo UI on http://127.0.0.1:{args.port}/  (data in {data})")
+    print(f"GateMoE demo UI on http://127.0.0.1:{args.port}/  (data in {data})", flush=True)
     uvicorn.run(app, host="127.0.0.1", port=args.port, log_level="warning")
     return 0
 
