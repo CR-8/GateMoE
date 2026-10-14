@@ -284,6 +284,8 @@ def main() -> int:
     ap.add_argument("--data", default="/tmp/gatemoe-demo")
     ap.add_argument("--video", help="an MP4 rendered earlier (its .vtt/.srt next to it are copied too)")
     ap.add_argument("--no-live", action="store_true", help="do not start the slow 'generating' job")
+    ap.add_argument("--host", default="127.0.0.1", help="listen address; 0.0.0.0 = reachable on the machine's public IP")
+    ap.add_argument("--password", default="", help="login password (user: gatemoe); required with a public --host")
     ap.add_argument("--allowed-host", action="append", default=[],
                     help="extra Host name the browser uses, e.g. a Cloud Shell web-preview domain ('*' = any)")
     args = ap.parse_args()
@@ -294,6 +296,8 @@ def main() -> int:
     from gatemoe.jobs import JobManager
     from gatemoe.server.app import create_app
 
+    if args.host not in ("127.0.0.1", "localhost", "::1") and len(args.password) < 8:
+        sys.exit("a public --host needs --password with at least 8 characters (the browser asks for user 'gatemoe')")
     data = Path(args.data).resolve()
     marker = data / ".gatemoe-demo"
     if data.exists() and any(data.iterdir()) and not marker.exists():   # never wipe a real node's data
@@ -306,7 +310,8 @@ def main() -> int:
     paths = {k: str(data / v) for k, v in (("jobs_dir", "jobs"), ("cache_dir", "cache"), ("models_dir", "models"),
                                              ("zim_dir", "zim"))}
     cfg = load_config(overrides={"paths": {"data_dir": str(data), **paths},
-                                 "server": {"auth": {"password": ""}, "allowed_hosts": args.allowed_host}})
+                                 "server": {"auth": {"user": "gatemoe", "password": args.password},
+                                            "allowed_hosts": args.allowed_host}})
     cfg.ensure_dirs()
     jobs_dir = cfg.path("paths.jobs_dir")
     video = Path(args.video) if args.video else None
@@ -349,8 +354,9 @@ def main() -> int:
         jobs.submit("Explain chemical bonding (ionic and covalent) for class 9 with a quiz and a podcast", {"language": "auto"})
         jobs.submit("Newton's laws of motion: flashcards and a short video", {"language": "auto"})
     app = create_app(cfg, jobs)
-    print(f"GateMoE demo UI on http://127.0.0.1:{args.port}/  (data in {data})", flush=True)
-    uvicorn.run(app, host="127.0.0.1", port=args.port, log_level="warning")
+    where = "<this machine's IP>" if args.host == "0.0.0.0" else args.host
+    print(f"GateMoE demo UI on http://{where}:{args.port}/  (data in {data})", flush=True)
+    uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
     return 0
 
 
