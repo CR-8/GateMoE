@@ -11,16 +11,16 @@
     <script src="assets/gsap.min.js"></script>
     <script src="assets/gm.js"></script>
     <style>
-      #stage { display: flex; flex-direction: column; padding: 52px 88px 76px; gap: 10px; }
+      #stage { display: flex; flex-direction: column; padding: 52px 104px 84px; gap: 10px; }
       #heading { font-size: 44px; font-weight: 700; line-height: 1.3; }
       #caption { font-size: 24px; color: var(--gm-muted); line-height: 1.4; }
       #plot { position: relative; flex: 1; min-height: 0; margin-top: 12px; }
-      #axis { position: absolute; left: 0; right: 0; bottom: 86px; height: 3px; background: #475569; }
+      #axis { position: absolute; left: 0; right: 0; bottom: 86px; height: 2px; background: var(--gm-mist); }
       #bars { position: absolute; left: 0; right: 0; top: 0; bottom: 0; display: flex; gap: 28px; padding: 0 12px; }
       .col { flex: 1 1 0; min-width: 0; position: relative; }
       .bar { position: absolute; left: 10%; right: 10%; bottom: 89px; border-radius: 10px 10px 0 0;
-             background: linear-gradient(180deg, #38bdf8, #0284c7); }
-      .bar.hi { background: linear-gradient(180deg, #fbbf24, #d97706); }
+             background: var(--gm-accent); }
+      .bar.hi { background: var(--gm-fg); }
       .val { position: absolute; left: -20px; right: -20px; text-align: center; font-weight: 700; font-size: 28px;
              font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; line-height: 1.3; }
       .lab { position: absolute; left: -10px; right: -10px; bottom: 0; height: 78px; text-align: center; font-size: 22px;
@@ -54,7 +54,7 @@
         GM.text(document.getElementById("heading"), p.heading);
         var cap = document.getElementById("caption");
         GM.text(cap, p.caption); if (!p.caption) cap.style.display = "none";
-        GM.text(document.getElementById("footer"), p.footer);
+        GM.chrome(p);
         var maxV = Math.max.apply(null, bars.map(function (b) { return b.value; }).concat([1e-9]));
         var holder = document.getElementById("bars");
         var counters = [];

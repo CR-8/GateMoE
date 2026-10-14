@@ -27,7 +27,8 @@ HERE = Path(__file__).resolve().parent
 TEMPLATES = HERE / "hf_templates"
 FALLBACK = HERE / "hf_fallback_render.mjs"
 TEMPLATE_FILES = {"title": "title.html", "bullets": "bullets.html", "steps": "steps.html",
-                  "bars": "barchart.html", "code": "code.html"}
+                  "bars": "barchart.html", "code": "code.html", "graph": "graph.html", "math": "math.html"}
+_SVG_URI = re.compile(r"data:image/svg\+xml;base64,[A-Za-z0-9+/=]+")
 RTL_LANGS = {"ar", "ur", "fa", "he", "ps", "sd", "ckb", "dv", "yi", "ug", "ks"}
 # C0/C1 controls (except \n, \t), zero-width no-break, bidi embedding/override/isolate controls.
 # ZWJ/ZWNJ (U+200C/U+200D) are KEPT: they are required for correct Indic shaping.
@@ -53,6 +54,12 @@ def build_payload(template: str, data: dict) -> dict:
     lang = clean_text(data.get("lang") or "en", 16)
     out = {"lang": lang, "dir": "rtl" if lang.split("-")[0].lower() in RTL_LANGS else "ltr",
            "footer": clean_text(data.get("footer"), 120)}
+    try:   # frame chrome: "3 / 9" + progress line (0 = none)
+        idx, tot = int(data.get("index") or 0), int(data.get("total") or 0)
+    except (TypeError, ValueError):
+        idx, tot = 0, 0
+    if 1 <= idx <= tot <= 99:
+        out.update(index=idx, total=tot)
     if template == "title":
         out.update(kicker=clean_text(data.get("kicker"), 60), title=clean_text(data.get("title"), 140),
                    subtitle=clean_text(data.get("subtitle"), 220))
@@ -102,13 +109,49 @@ def build_payload(template: str, data: dict) -> dict:
                 hls.append({"lines": lines, "note": clean_text(h.get("note"), 140)})
         out.update(heading=clean_text(data.get("heading"), 120),
                    language=clean_text(data.get("language") or "text", 16).lower(), code=code, highlights=hls)
+    elif template == "graph":
+        def rng(v):
+            if not isinstance(v, (list, tuple)) or len(v) != 3:
+                raise ValueError("graph: axis must be [min, max, step]")
+            a, b, st = (float(x) for x in v)
+            if not all(math.isfinite(x) for x in (a, b, st)) or b <= a or st <= 0 or (b - a) / st > 40:
+                raise ValueError("graph: bad axis range")
+            return [a, b, st]
+        segs, n = [], 0
+        for seg in (data.get("segments") or [])[:40]:
+            pts = []
+            for pt in seg or []:
+                try:
+                    x, y = float(pt[0]), float(pt[1])
+                except (TypeError, ValueError, IndexError):
+                    continue
+                if math.isfinite(x) and math.isfinite(y):
+                    pts.append([x, y])
+            if len(pts) >= 2:
+                segs.append(pts)
+                n += len(pts)
+        if not segs or n > 4000:
+            raise ValueError("graph: need 1-40 curve segments (<= 4000 points)")
+        out.update(heading=clean_text(data.get("heading"), 120), caption=clean_text(data.get("caption"), 160),
+                   label=clean_text(data.get("label"), 40), x_label=clean_text(data.get("x_label") or "x", 12),
+                   y_label=clean_text(data.get("y_label") or "y", 12), x=rng(data.get("x")), y=rng(data.get("y")),
+                   segments=segs)
+    elif template == "math":
+        items = []
+        for it in (data.get("items") or [])[:6]:
+            svg = str((it or {}).get("svg") or "")
+            if len(svg) <= 300_000 and _SVG_URI.fullmatch(svg):
+                items.append({"svg": svg, "caption": clean_text(it.get("caption"), 120)})
+        if not items:
+            raise ValueError("math: need 1-6 compiled equation images")
+        out.update(heading=clean_text(data.get("heading"), 120), items=items)
     else:
         raise ValueError(f"unknown template {template!r}")
     return out
 
 
 def anim_seconds(template: str) -> float:
-    return {"title": 2.4, "bullets": 3.0, "steps": 3.0, "bars": 3.0, "code": 3.0}[template]
+    return {"title": 2.4, "bullets": 3.0, "steps": 3.0, "bars": 3.0, "code": 3.0, "graph": 3.0, "math": 3.0}[template]
 
 
 def extend_hold(ffmpeg: str, src: Path, dst: Path, total: float, fps: int, crf: str = "20",

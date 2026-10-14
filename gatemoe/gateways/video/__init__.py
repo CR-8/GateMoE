@@ -7,9 +7,9 @@ then to the other engine, so one bad beat never sinks the video.
 """
 from __future__ import annotations
 
-import shutil
-
+import base64
 import re
+import shutil
 import time
 from pathlib import Path
 
@@ -34,10 +34,47 @@ def _split_step(line: str) -> dict:
     return {"label": line[:60]}
 
 
-def hf_scene(beat: dict, lang: str, lesson_title: str) -> tuple[str, dict]:
-    """Map a plan beat onto a HyperFrames template + payload."""
+def _hf_math(beat: dict) -> list[dict] | None:
+    """equation_steps -> Typst-compiled SVG images (the same math Manim would typeset)."""
+    from .safe_math import SpecError, check_typst_math, typst_math_compiles, typst_svg
+
+    eqs = [str(e).strip() for e in (beat.get("equations") or []) if str(e).strip()][:6]
+    caps = [str(x).strip() for x in (beat.get("lines") or [])]
+    try:
+        items = []
+        for i, e in enumerate(eqs):
+            svg = typst_svg(typst_math_compiles(check_typst_math(e)))
+            items.append({"svg": "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode(),
+                          "caption": caps[i] if i < len(caps) else ""})
+        return items or None
+    except (SpecError, Exception):
+        return None
+
+
+def _hf_graph(beat: dict) -> dict | None:
+    from .safe_math import curve_points
+
+    def num(v, d):
+        try:
+            f = float(v)
+            return f if f == f and abs(f) < 1e4 else d
+        except (TypeError, ValueError):
+            return d
+    lo, hi = num(beat.get("x_min"), -5.0), num(beat.get("x_max"), 5.0)
+    if hi <= lo:
+        lo, hi = -5.0, 5.0
+    try:
+        return curve_points(str(beat.get("expression") or "")[:160], lo, hi)
+    except Exception:
+        return None
+
+
+def hf_scene(beat: dict, lang: str, lesson_title: str, index: int = 0, total: int = 0) -> tuple[str, dict]:
+    """Map a plan beat onto a HyperFrames template + payload. Beats planned for Manim (equations,
+    graphs, binary search) get HyperFrames twins, so a fallback keeps the content, not just a caption."""
     t, title = beat.get("template"), beat.get("title", "")
-    base = {"lang": lang}
+    base = {"lang": lang, "index": index, "total": total,
+            "footer": lesson_title if (t != "title" and lesson_title != title) else ""}
     if t == "title":
         return "title", {**base, "kicker": lesson_title if lesson_title != title else "", "title": title,
                          "subtitle": (beat.get("lines") or [""])[0]}
@@ -52,8 +89,27 @@ def hf_scene(beat: dict, lang: str, lesson_title: str) -> tuple[str, dict]:
         hl = [{"lines": [int(h)], "note": notes[i] if i < len(notes) else ""}
               for i, h in enumerate(beat.get("highlight") or [])]
         return "code", {**base, "heading": title, "language": "python", "code": beat.get("code", ""), "highlights": hl}
-    if t in ("equation_steps",):
+    if t == "equation_steps":
+        items = _hf_math(beat)
+        if items:
+            return "math", {**base, "heading": title, "items": items}
         return "bullets", {**base, "heading": title, "bullets": (beat.get("equations") or _lines(beat))[:6]}
+    if t == "function_graph":
+        g = _hf_graph(beat)
+        if g:
+            # like Manim's GraphBeat: the first line labels the curve
+            return "graph", {**base, "heading": title, "label": str((beat.get("lines") or [""])[0])[:40], **g}
+    if t == "array_steps":
+        from .manim_engine import binary_search_steps
+        vals = sorted({v for v in (beat.get("values") or []) if isinstance(v, (int, float))})[:16]
+        if vals:
+            target = beat.get("target") if isinstance(beat.get("target"), (int, float)) else vals[len(vals) // 2]
+            trace = binary_search_steps(vals, target)[:6]
+            if len(trace) >= 2:
+                return "steps", {**base, "heading": title, "steps": [
+                    {"label": f"[{', '.join(str(vals[i]) for i in sorted(set(st['pointers'].values())))}]"
+                     if st.get("pointers") else "∅", "detail": st.get("caption", ""), "tag": str(k + 1)}
+                    for k, st in enumerate(trace)]}
     # bullets, definition, and anything else
     return "bullets", {**base, "heading": title, "bullets": _lines(beat)}
 
@@ -96,7 +152,7 @@ class VideoGateway:
             bad = {}
             for i, b in enumerate(beats):
                 try:
-                    build_payload(*hf_scene(b, lang, plan.get("title", "")))
+                    build_payload(*hf_scene(b, lang, plan.get("title", ""), i + 1, len(beats)))
                 except ValueError as exc:
                     bad[i] = str(exc)
             return bad
@@ -107,19 +163,24 @@ class VideoGateway:
         return {"template": "bullets", "title": beat.get("title", ""), "lines": _lines(beat),
                 "narration": beat.get("narration", "")}
 
-    def _render_pass(self, engine: str, jobs: list[tuple], lang: str, title: str, work: Path) -> dict:
+    def _render_pass(self, engine: str, jobs: list[tuple], lang: str, title: str, work: Path, total: int = 0) -> dict:
         """jobs = [(index, beat, out_path, duration)] -> {index: info dict | error string}."""
         eng, results = self.engines[engine], {}
         if engine == "manim":
             from .manim_engine import beat_to_spec
-            res = eng.render_many([(beat_to_spec(b, lang), out, d) for (_, b, out, d) in jobs], work)
+
+            def footer(i, b):   # same frame chrome as the HyperFrames templates
+                return {"text": title if (b.get("template") != "title" and title != b.get("title")) else "",
+                        "index": i + 1, "total": total}
+            res = eng.render_many([({**beat_to_spec(b, lang), "footer": footer(i, b)}, out, d)
+                                   for (i, b, out, d) in jobs], work)
             for (i, b, _, _), r in zip(jobs, res):
                 results[i] = ({"template": r.get("template"), "renderer": "manim", **r} if r.get("ok") else
                               f"manim/{b.get('template')}: {r.get('kind')}: {str(r.get('error', ''))[:300]}")
             return results
         for i, b, out, d in jobs:
             try:
-                tpl, data = hf_scene(b, lang, title)
+                tpl, data = hf_scene(b, lang, title, i + 1, total)
                 results[i] = {"template": tpl, **eng.render(tpl, data, out, d, work)}
             except Exception as exc:
                 results[i] = f"{engine}/{b.get('template')}: {type(exc).__name__}: {str(exc)[:300]}"
@@ -166,7 +227,7 @@ class VideoGateway:
             if events:
                 events.check_cancel()
             jobs = [(i, self._safe_beat(b) if safe else b, out, d) for (i, b, out, d) in pending]
-            res = self._render_pass(eng_name, jobs, lang, plan.get("title", ""), work)
+            res = self._render_pass(eng_name, jobs, lang, plan.get("title", ""), work, len(beats))
             still = []
             for job in pending:
                 r = res.get(job[0])

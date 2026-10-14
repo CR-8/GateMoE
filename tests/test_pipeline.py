@@ -8,6 +8,7 @@ from gatemoe.runtime.events import EventLog
 
 
 def test_pipeline_routes_and_generates(cfg, tmp_path):
+    cfg.tree["video"]["enabled_engines"] = []        # no renderer, even where Manim is pip-installed
     pipe = LessonPipeline(cfg)
     out = tmp_path / "lesson"
     out.mkdir()

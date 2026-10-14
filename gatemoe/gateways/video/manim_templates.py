@@ -78,20 +78,29 @@ if not getattr(_typst.compile, "_gatemoe", False):
 # --------------------------------------------------------------------------
 # Visual constants (frame is 14.22 x 8 Manim units at 16:9 regardless of px)
 # --------------------------------------------------------------------------
-BG = "#0E1726"
-FG = "#F5F7FA"
-MUTED = "#9AA5B1"
-ACCENT = "#FFC857"
-CURVE = "#4FC3F7"
-GOOD = "#7BD389"
-POINTER_COLORS = ["#FF6B6B", "#FFC857", "#4FC3F7", "#C792EA"]
+# GateMoE design system (docs/DESIGN.md): light canvas, charcoal ink, one blue accent,
+# green only for "found / correct". Same palette as the HyperFrames templates (base.css).
+BG = "#F8F9FA"        # canvas
+FG = "#202124"        # charcoal ink
+MUTED = "#5F6368"     # slate
+MIST = "#DADCE0"      # hairlines
+ACCENT = "#1A73E8"    # Google blue
+CURVE = "#1A73E8"
+GOOD = "#188038"      # classroom green (success only)
+CELL = "#FFFFFF"      # card surface
+POINTER_COLORS = ["#D93025", "#1A73E8", "#188038", "#9334E6"]
 FRAME_W = 14.2
 SAFE_W = 12.6  # usable width inside margins
 SAFE_H = 7.0
 
 
-class SpecError(ValueError):
-    """Invalid beat spec. The message is meant to be fed back to the LLM."""
+try:  # package import (server) or top-level import (Manim child process puts this folder on sys.path)
+    from .safe_math import (SpecError, _CONSTS, _FUNCS, MAX_MATH_CHARS, check_typst_math, eval_expr,  # noqa: F401
+                            nice_axis, normalize_expr, parse_expr, typst_math_compiles)
+except ImportError:
+    from safe_math import (SpecError, _CONSTS, _FUNCS, MAX_MATH_CHARS, check_typst_math, eval_expr,  # noqa: F401
+                           nice_axis, normalize_expr, parse_expr, typst_math_compiles)
+
 
 
 # --------------------------------------------------------------------------
@@ -277,198 +286,6 @@ def make_text(s: str, *, font_size: float, lang: str | None, color: str = FG,
 
 
 # --------------------------------------------------------------------------
-# Safe function expressions for GraphBeat: ast whitelist + tree-walker.
-# --------------------------------------------------------------------------
-_FUNCS = {
-    "sin": np.sin, "cos": np.cos, "tan": np.tan, "asin": np.arcsin,
-    "acos": np.arccos, "atan": np.arctan, "sinh": np.sinh, "cosh": np.cosh,
-    "tanh": np.tanh, "exp": np.exp, "log": np.log, "ln": np.log,
-    "log10": np.log10, "log2": np.log2, "sqrt": np.sqrt, "abs": np.abs,
-}
-_CONSTS = {"pi": math.pi, "e": math.e}
-_BINOPS = {ast.Add: np.add, ast.Sub: np.subtract, ast.Mult: np.multiply,
-           ast.Div: np.divide, ast.Pow: np.power}
-MAX_EXPR_CHARS = 160
-MAX_EXPR_NODES = 80
-
-_IMPLICIT_FN = "|".join(sorted(_FUNCS, key=len, reverse=True))
-
-
-def normalize_expr(src: str) -> str:
-    s = src.strip().replace("^", "**").replace("−", "-").replace("×", "*")
-    s = re.sub(r"^\s*(?:y|f\s*\(\s*x\s*\))\s*=", "", s).strip()  # drop "y =" / "f(x) ="
-    # implicit multiplication: 2x, 3(x+1), 2sin(x), 2pi, )(, )x, x(
-    s = re.sub(rf"(?<![A-Za-z_\d.])(\d+(?:\.\d+)?)\s*(?=(?:x\b|pi\b|\(|(?:{_IMPLICIT_FN})\s*\())", r"\1*", s)
-    s = re.sub(r"\)\s*(?=[(x\d])", ")*", s)
-    s = re.sub(r"\bx\s*(?=\()", "x*", s)
-    return s
-
-
-def parse_expr(src: str) -> ast.Expression:
-    if not isinstance(src, str) or not src.strip():
-        raise SpecError("expr must be a non-empty string")
-    if len(src) > MAX_EXPR_CHARS:
-        raise SpecError(f"expr longer than {MAX_EXPR_CHARS} chars")
-    s = normalize_expr(src)
-    try:
-        tree = ast.parse(s, mode="eval")
-    except SyntaxError as e:
-        raise SpecError(f"expr is not a valid formula: {src!r} ({e.msg})") from None
-    n = 0
-    for node in ast.walk(tree):
-        n += 1
-        if n > MAX_EXPR_NODES:
-            raise SpecError("expr too complex")
-        if isinstance(node, (ast.Expression, ast.Load)) or type(node) in _BINOPS:
-            continue
-        if isinstance(node, (ast.UAdd, ast.USub)):
-            continue
-        if isinstance(node, ast.BinOp):
-            if type(node.op) not in _BINOPS:
-                raise SpecError(f"operator {type(node.op).__name__} not allowed (use + - * / ** )")
-            continue
-        if isinstance(node, ast.UnaryOp):
-            if not isinstance(node.op, (ast.UAdd, ast.USub)):
-                raise SpecError("only unary + and - allowed")
-            continue
-        if isinstance(node, ast.Constant):
-            if isinstance(node.value, bool) or not isinstance(node.value, (int, float)):
-                raise SpecError("only numeric constants allowed")
-            continue
-        if isinstance(node, ast.Name):
-            if node.id != "x" and node.id not in _CONSTS and node.id not in _FUNCS:
-                raise SpecError(f"unknown name {node.id!r}; allowed: x, pi, e, {', '.join(_FUNCS)}")
-            continue
-        if isinstance(node, ast.Call):
-            if (not isinstance(node.func, ast.Name) or node.func.id not in _FUNCS
-                    or len(node.args) != 1 or node.keywords):
-                raise SpecError("only single-argument calls to " + ", ".join(_FUNCS))
-            continue
-        raise SpecError(f"syntax element {type(node).__name__} not allowed")
-    return tree
-
-
-def eval_expr(tree: ast.Expression, x: np.ndarray) -> np.ndarray:
-    """Vectorised evaluation of a pre-validated tree. All maths in float64,
-    so 10**10**10 gives inf instead of hanging on a Python bigint."""
-
-    def ev(node):
-        if isinstance(node, ast.Expression):
-            return ev(node.body)
-        if isinstance(node, ast.Constant):
-            return np.float64(node.value)
-        if isinstance(node, ast.Name):
-            if node.id == "x":
-                return x
-            if node.id in _CONSTS:
-                return np.float64(_CONSTS[node.id])
-            raise SpecError(f"{node.id} used as a value")
-        if isinstance(node, ast.UnaryOp):
-            v = ev(node.operand)
-            return -v if isinstance(node.op, ast.USub) else v
-        if isinstance(node, ast.BinOp):
-            return _BINOPS[type(node.op)](ev(node.left), ev(node.right))
-        if isinstance(node, ast.Call):
-            return _FUNCS[node.func.id](ev(node.args[0]))
-        raise SpecError("bad expression")
-
-    with np.errstate(all="ignore"):
-        y = ev(tree)
-    return np.broadcast_to(np.asarray(y, dtype=np.float64), x.shape).copy()
-
-
-def nice_axis(lo: float, hi: float, target_ticks: int = 8) -> tuple[float, float, float]:
-    """Pick a 1/2/2.5/5 x 10^k tick step and snap [lo, hi] outward to it,
-    preferring steps that need little overshoot and give ~target ticks."""
-    span = hi - lo
-    mag = 10 ** math.floor(math.log10(span / target_ticks))
-    best = None
-    for m in (0.5, 1, 2, 2.5, 5, 10, 20):
-        step = m * mag
-        a0, a1 = math.floor(lo / step + 1e-9) * step, math.ceil(hi / step - 1e-9) * step
-        ticks = round((a1 - a0) / step)
-        if not 3 <= ticks <= 14:
-            continue
-        score = (a1 - a0 - span) / span + 0.04 * abs(ticks - target_ticks)
-        if best is None or score < best[0]:
-            best = (score, a0, a1, step)
-    if best is None:
-        return lo, hi, span / target_ticks
-    _, a0, a1, step = best
-    if float(step).is_integer():  # integer steps -> integer tick labels ("2" not "2.0")
-        step, a0, a1 = int(step), int(round(a0)), int(round(a1))
-    return a0, a1, step
-
-
-# --------------------------------------------------------------------------
-# Typst math safety: math mode only. No '#' (code mode: #read, #import
-# "@preview/..." would even try to download packages), no '$' (escape math
-# mode), no comments, no raw/labels/refs. Verified: in math mode `read`,
-# `eval`, `json` are "unknown variable" in typst 0.15.
-# --------------------------------------------------------------------------
-_TYPST_FORBIDDEN = ["#", "$", "`", "@", "//", "/*", "*/", "<<", ">>", "{{", "}}"]
-MAX_MATH_CHARS = 200
-_LATEX_BRACES_RE = re.compile(r"(?:\b(?:frac|dfrac|sqrt|vec|hat|bar|overline|underline|text|mathrm|mathbf|"
-                              r"operatorname|binom|left|right)\s*\{)|[\^_]\s*\{|\}\s*\{")
-
-
-def check_typst_math(s: str) -> str:
-    if not isinstance(s, str) or not s.strip():
-        raise SpecError("math must be a non-empty string")
-    if len(s) > MAX_MATH_CHARS:
-        raise SpecError(f"math longer than {MAX_MATH_CHARS} chars")
-    for bad in _TYPST_FORBIDDEN:
-        if bad in s:
-            raise SpecError(f"math must be Typst math WITHOUT {bad!r} (no $ delimiters, no # code)")
-    if "\\" in s and re.search(r"\\[A-Za-z]{2,}", s):
-        raise SpecError("math looks like LaTeX (\\frac etc.); use Typst math: frac(a, b), sqrt(x), x^2, dif x")
-    # LaTeX brace groups compile in Typst but render literal braces: frac{a}{b}, x^{2n}
-    if _LATEX_BRACES_RE.search(s):
-        raise SpecError("math uses LaTeX braces; in Typst write frac(a, b), sqrt(x), x^(2n), x_(i j) "
-                        "(braces {} only for literal sets like {1, 2})")
-    if s.count("(") != s.count(")") or s.count("[") != s.count("]") or s.count("{") != s.count("}"):
-        raise SpecError("unbalanced brackets in math")
-    return s.strip()
-
-
-_UNKNOWN_VAR_RE = re.compile(r"unknown variable: ([A-Za-z]+)")
-
-
-def typst_math_compiles(m: str) -> str:
-    """Compile `$ m $` with Typst (~5 ms, embedded fonts only, sandbox root = a
-    fresh temp dir). Auto-repairs the most common small-LLM mistake - unknown
-    multi-letter identifiers: dx -> dif x, ab -> a b, speed -> "speed". Returns the (repaired)
-    math or raises SpecError with Typst's message (feed it back to the LLM)."""
-    import tempfile
-
-    with tempfile.TemporaryDirectory(prefix="gm_typst_") as d:
-        path = os.path.join(d, "m.typ")
-        for _ in range(6):
-            with open(path, "w", encoding="utf-8") as f:
-                f.write("#set page(width: auto, height: auto, margin: 0pt)\n$ " + m + " $\n")
-            try:
-                _typst.compile(path, format="svg", root=d, ignore_system_fonts=True)
-                return m
-            except _typst.TypstError as e:
-                msg = str(e).splitlines()[0] if str(e) else "Typst error"
-                hit = _UNKNOWN_VAR_RE.search(str(e))
-                if not hit:
-                    raise SpecError(f"math does not compile: {msg}") from None
-                name = hit.group(1)
-                if re.fullmatch(r"d[a-z]", name):
-                    fix = f"dif {name[1:]}"          # dx -> dif x
-                elif len(name) == 2:
-                    fix = " ".join(name)             # ab -> a b (product)
-                else:
-                    fix = f'"{name}"'                # speed -> "speed" (upright text)
-                m2 = re.sub(rf"(?<![A-Za-z\"]){name}(?![A-Za-z\"])", fix, m)
-                if m2 == m:
-                    raise SpecError(f"math does not compile: {msg} (write multi-letter words as \"text\")") from None
-                m = m2
-    raise SpecError("math does not compile after repairs")
-
-
-# --------------------------------------------------------------------------
 # Spec validation
 # --------------------------------------------------------------------------
 BEAT_TYPES = ("title", "equation", "graph", "array_steps", "bullets")
@@ -548,6 +365,15 @@ def validate_spec(spec: dict) -> dict:
     out["hold"] = _num(spec, "hold", 0, 120, 0)
     out["anim_seconds"] = _num(spec, "anim_seconds", 0.5, 6, 3.0)
     out["title"] = _str(spec, "title", 90, required=(t == "title"))
+    foot = spec.get("footer")
+    out["footer"] = None
+    if isinstance(foot, dict):
+        try:
+            idx, tot = int(foot.get("index", 0)), int(foot.get("total", 0))
+        except (TypeError, ValueError):
+            idx, tot = 0, 0
+        out["footer"] = {"text": _str(foot, "text", 80, required=False),
+                         "index": idx if 1 <= idx <= 99 else 0, "total": tot if 1 <= tot <= 99 else 0}
 
     if t == "title":
         out["subtitle"] = _str(spec, "subtitle", 140, required=False)
@@ -673,6 +499,26 @@ class _BeatBase(Scene):
         self.camera.background_color = BG
         if not hasattr(self, "spec") or self.spec is None:
             self.spec = load_spec()
+        self.add_chrome()
+
+    def add_chrome(self):
+        """Static frame chrome shared with the HyperFrames templates: lesson name bottom-left,
+        "3 / 9" bottom-right and a thin progress line along the bottom edge."""
+        f = self.spec.get("footer") or {}
+        mobs = []
+        if f.get("total"):
+            track = Line([-7.111, -3.97, 0], [7.111, -3.97, 0], color=MIST, stroke_width=6)
+            frac = max(0.0, min(1.0, f["index"] / f["total"]))
+            mobs.append(track)
+            if frac > 0:
+                mobs.append(Line([-7.111, -3.97, 0], [-7.111 + 14.222 * frac, -3.97, 0], color=ACCENT, stroke_width=6))
+            cnt = Text(f"{f['index']} / {f['total']}", font="Noto Sans", font_size=18, color=MUTED)
+            mobs.append(cnt.move_to([6.6 - cnt.width / 2, -3.62, 0]))
+        if f.get("text"):
+            t = make_text(f["text"], font_size=18, lang=self.spec.get("lang"), color=MUTED, max_width=9.0)
+            mobs.append(t.move_to([-6.6 + t.width / 2, -3.62, 0]))
+        if mobs:
+            self.add(*mobs)
 
     def finish(self):
         if os.environ.get("GATEMOE_HOLD_IN_MANIM", "0") == "1" and self.spec.get("hold", 0) > 0:
@@ -684,26 +530,33 @@ class _BeatBase(Scene):
         return getattr(self.renderer, "num_plays", 0) > 0
 
     def header(self):
+        """Left-aligned heading with a short blue rule under it (right-aligned for RTL scripts)."""
         if not self.spec.get("title"):
             return None
+        rtl = is_rtl(self.spec["title"])
         t = make_text(self.spec["title"], font_size=40, lang=self.spec["lang"],
-                      color=ACCENT, max_units=46, weight="BOLD")
-        t.to_edge(UP, buff=0.45)
-        return t
+                      color=FG, max_units=46, weight="BOLD")
+        bar = Line(LEFT * 0.6, RIGHT * 0.6, color=ACCENT, stroke_width=6)
+        head = VGroup(t, bar).arrange(DOWN, buff=0.22, aligned_edge=RIGHT if rtl else LEFT)
+        head.to_edge(UP, buff=0.5)
+        head.to_edge(RIGHT if rtl else LEFT, buff=0.9)
+        return head
 
 
 class TitleBeat(_BeatBase):
     def construct(self):
         s, lang = self.spec, self.spec["lang"]
         a = s["anim_seconds"]
-        title = make_text(s["title"], font_size=60, lang=lang, max_units=28, weight="BOLD")
-        bar = Line(LEFT * 3, RIGHT * 3, color=ACCENT, stroke_width=6)
+        rtl = is_rtl(s["title"])
+        title = make_text(s["title"], font_size=64, lang=lang, max_units=28, weight="BOLD", max_width=11.5)
+        bar = Line(LEFT * 0.8, RIGHT * 0.8, color=ACCENT, stroke_width=7)
         group = [title, bar]
         sub = None
         if s.get("subtitle"):
-            sub = make_text(s["subtitle"], font_size=32, lang=lang, color=MUTED, max_units=52)
+            sub = make_text(s["subtitle"], font_size=32, lang=lang, color=MUTED, max_units=52, max_width=11.5)
             group.append(sub)
-        VGroup(*group).arrange(DOWN, buff=0.45).move_to(ORIGIN)
+        block = VGroup(*group).arrange(DOWN, buff=0.4, aligned_edge=RIGHT if rtl else LEFT)
+        block.move_to([0, 0.25, 0]).to_edge(RIGHT if rtl else LEFT, buff=1.0)
         self.play(FadeIn(title, shift=UP * 0.3), run_time=a * 0.45)
         self.play(GrowFromCenter(bar), run_time=a * 0.2)
         if sub is not None:
@@ -719,24 +572,21 @@ class BulletsBeat(_BeatBase):
         rtl = is_rtl(" ".join(s["bullets"]))
         items = []
         for b in s["bullets"]:
-            line = make_text(b, font_size=32, lang=lang, max_units=48, max_width=SAFE_W - 0.8)
-            dot = Dot(radius=0.07, color=ACCENT)
+            line = make_text(b, font_size=34, lang=lang, max_units=46, max_width=SAFE_W - 0.8)
+            dot = Dot(radius=0.08, color=ACCENT)
             row = VGroup(line, dot) if rtl else VGroup(dot, line)
             row.arrange(RIGHT, buff=0.3, aligned_edge=UP)
             dot.shift(DOWN * 0.18)
             items.append(row)
-        body = VGroup(*items).arrange(DOWN, buff=0.38, aligned_edge=RIGHT if rtl else LEFT)
-        top = head.get_bottom()[1] - 0.5 if head is not None else 3.4
-        max_h = top + 3.6
-        if body.height > max_h:
-            body.scale_to_fit_height(max_h)
+        body = VGroup(*items).arrange(DOWN, buff=0.42, aligned_edge=RIGHT if rtl else LEFT)
+        top = head.get_bottom()[1] - 0.45 if head is not None else 3.4
+        bottom = -3.2                      # keep clear of the footer
+        if body.height > top - bottom:
+            body.scale_to_fit_height(top - bottom)
         if body.width > SAFE_W:
             body.scale_to_fit_width(SAFE_W)
-        body.next_to([0, top, 0], DOWN, buff=0)
-        if rtl:
-            body.to_edge(RIGHT, buff=0.8)
-        else:
-            body.to_edge(LEFT, buff=0.8)
+        body.move_to([0, (top + bottom) / 2, 0])
+        body.to_edge(RIGHT if rtl else LEFT, buff=0.9)
         if head is not None:
             self.play(FadeIn(head, shift=DOWN * 0.2), run_time=min(0.6, a * 0.25))
             a -= min(0.6, a * 0.25)
@@ -930,18 +780,20 @@ class GraphBeat(_BeatBase):
                 y1 = 0.0
         ay0, ay1, ystep = nice_axis(y0, y1, 6)
         head = self.header()
-        ax_h = 5.2 if head is not None else 6.0
+        ax_h = 4.6 if head is not None else 5.6
         axes = Axes(
             x_range=[ax0, ax1, xstep], y_range=[ay0, ay1, ystep],
             x_length=11.0, y_length=ax_h, tips=False,
             axis_config={"color": MUTED, "include_numbers": True, "font_size": 22,
                          "label_constructor": MathTypst},
         )
-        axes.move_to(DOWN * 0.35 if head is not None else ORIGIN)
+        axes.move_to(DOWN * 0.45 if head is not None else ORIGIN)
         # tick numbers above the curve with a background-coloured halo, so a
         # curve passing through "-2.5" does not make it unreadable
         for nl in (axes.x_axis, axes.y_axis):
             for num in getattr(nl, "numbers", []) or []:
+                # Manim draws axis numbers white by default: invisible on the light canvas
+                num.set_color(MUTED)
                 num.set_stroke(BG, width=7, background=True).set_z_index(3)
         xl =make_text(s["x_label"], font_size=26, lang=lang, color=MUTED).next_to(axes.x_axis, RIGHT, buff=0.15)
         yl = make_text(s["y_label"], font_size=26, lang=lang, color=MUTED).next_to(axes.y_axis, UP, buff=0.15)
@@ -1006,7 +858,7 @@ class ArrayStepsBeat(_BeatBase):
         side = min(0.95, SAFE_W / n)
         cells = VGroup()
         for i, v in enumerate(s["values"]):
-            sq = Square(side_length=side, color=FG, stroke_width=3, fill_color=BG, fill_opacity=1)
+            sq = Square(side_length=side, color=MUTED, stroke_width=3, fill_color=CELL, fill_opacity=1)
             txt = Text(v, font=pick_font(v), font_size=30 * side / 0.95, color=FG)
             if txt.width > side * 0.84:  # 5-char values must stay inside the box
                 txt.scale_to_fit_width(side * 0.84)
@@ -1034,11 +886,11 @@ class ArrayStepsBeat(_BeatBase):
             for i, c in enumerate(cells):
                 sq, txt = c
                 if i in step["found"]:
-                    fill, op, tcol = GOOD, 0.85, BG
+                    fill, op, tcol = GOOD, 1.0, CELL
                 elif i in step["highlight"]:
-                    fill, op, tcol = ACCENT, 0.85, BG
+                    fill, op, tcol = ACCENT, 1.0, CELL
                 else:
-                    fill, op, tcol = BG, 1.0, FG
+                    fill, op, tcol = CELL, 1.0, FG
                 o = 0.25 if i in step["dim"] else 1.0
                 anims.append(sq.animate.set_fill(fill, opacity=op).set_stroke(opacity=o))
                 anims.append(txt.animate.set_color(tcol).set_opacity(o))

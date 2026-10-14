@@ -15,21 +15,21 @@
       #stage { display: flex; flex-direction: column; padding: 40px 64px 64px; gap: 18px; }
       #top { display: flex; align-items: baseline; gap: 18px; }
       #heading { font-size: 38px; font-weight: 700; line-height: 1.3; flex: 1; min-width: 0; }
-      #langtag { font-family: var(--gm-mono); font-size: 18px; color: #0f172a; background: var(--gm-accent2);
-                 padding: 4px 12px; border-radius: 6px; font-weight: 700; }
-      #editor { position: relative; flex: 1; min-height: 0; background: #0b1220; border: 1px solid #1f2a44;
-                border-radius: 14px; overflow: hidden; }
+      #langtag { font-family: var(--gm-mono); font-size: 18px; color: var(--gm-accent-deep); background: var(--gm-tint);
+                 padding: 4px 14px; border-radius: 200px; font-weight: 700; }
+      #editor { position: relative; flex: 1; min-height: 0; background: var(--gm-panel); border: 1px solid var(--gm-mist);
+                border-radius: 24px; overflow: hidden; }
       #code { position: absolute; left: 0; right: 0; top: 18px; font-family: var(--gm-mono); white-space: pre; }
       .line { display: flex; }
-      .ln { flex: 0 0 3.2em; text-align: right; padding-right: 1.1em; color: #8b9bb4; user-select: none; }
-      .src { flex: 1; min-width: 0; overflow: hidden; color: #e2e8f0; }
-      #hl { position: absolute; left: 0; right: 0; top: 18px; background: rgba(56,189,248,0.16);
+      .ln { flex: 0 0 3.2em; text-align: right; padding-right: 1.1em; color: #9aa0a6; user-select: none; }
+      .src { flex: 1; min-width: 0; overflow: hidden; color: var(--gm-fg); }
+      #hl { position: absolute; left: 0; right: 0; top: 18px; background: rgba(26,115,232,0.10);
             border-left: 5px solid var(--gm-accent); opacity: 0; }
-      .note { position: absolute; right: 22px; bottom: 18px; max-width: 62%; background: var(--gm-accent2); color: #111827;
+      .note { position: absolute; right: 22px; bottom: 18px; max-width: 62%; background: var(--gm-accent); color: #ffffff;
               font-size: 24px; font-weight: 700; line-height: 1.35; padding: 12px 18px; border-radius: 10px; opacity: 0;
               overflow-wrap: anywhere; }
-      .k { color: #c084fc; } .s { color: #86efac; } .c { color: #8b9bb4; font-style: italic; }
-      .n { color: #fbbf24; } .f { color: #7dd3fc; }
+      .k { color: #9334e6; } .s { color: #188038; } .c { color: #5f6368; font-style: italic; }
+      .n { color: #b06000; } .f { color: #1967d2; }
     </style>
   </head>
   <body>
@@ -48,7 +48,7 @@
         var language = String(p.language || "text").toLowerCase();
         GM.text(document.getElementById("heading"), p.heading);
         GM.text(document.getElementById("langtag"), language);
-        GM.text(document.getElementById("footer"), p.footer);
+        GM.chrome(p);
         var MAXL = 22;
         var lines = String(p.code || "").replace(/\r\n?/g, "\n").replace(/\t/g, "    ").split("\n").slice(0, MAXL);
         while (lines.length > 1 && lines[lines.length - 1].trim() === "") lines.pop();

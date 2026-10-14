@@ -40,7 +40,7 @@
         var steps = (Array.isArray(p.steps) ? p.steps : []).slice(0, 6);
         var n = Math.max(steps.length, 1);
         GM.text(document.getElementById("heading"), p.heading);
-        GM.text(document.getElementById("footer"), p.footer);
+        GM.chrome(p);
         var wrap = document.getElementById("steps");
         var texts = [p.heading, p.footer];
         steps.forEach(function (s, i) {

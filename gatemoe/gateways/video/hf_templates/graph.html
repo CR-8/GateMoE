@@ -1,0 +1,110 @@
+<!doctype html>
+<!-- GateMoE template: function graph (the HyperFrames twin of Manim's GraphBeat). Points are sampled in
+     Python by safe_math.curve_points (whitelisted expression evaluator), never evaluated here.
+     The axes fade in, the curve draws along its length, the label pops. Animation ends <= 3.0 s then holds.
+     payload = {"heading":str, "caption":str?, "label":str?, "x":[min,max,step], "y":[min,max,step],
+                "segments":[[[x,y],...],...], "x_label":str?, "y_label":str?, "footer":str?, "index":int?, "total":int?,
+                "lang":"en", "dir":"ltr"} -->
+<html lang="en" data-composition-variables='[{"id":"payload","type":"string","label":"Scene payload (JSON)","default":"{\"heading\":\"y = x/2\",\"x\":[0,10,1],\"y\":[0,5,1],\"segments\":[[[0,0],[10,5]]],\"label\":\"slope 1/2\"}"}]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1280, height=720" />
+    <link rel="stylesheet" href="assets/base.css" />
+    <script src="assets/gsap.min.js"></script>
+    <script src="assets/gm.js"></script>
+    <style>
+      #stage { display: flex; flex-direction: column; padding: 52px 104px 84px; gap: 12px; }
+      #heading { font-size: 44px; font-weight: 700; line-height: 1.25; }
+      #caption { font-size: 24px; color: var(--gm-muted); line-height: 1.4; }
+      #plot { flex: 1; min-height: 0; }
+      svg { width: 100%; height: 100%; overflow: visible; }
+      .tick { font-size: 18px; fill: var(--gm-muted); font-variant-numeric: tabular-nums; }
+      .axl { font-size: 22px; fill: var(--gm-muted); }
+      .lab { font-size: 26px; font-weight: 700; fill: var(--gm-accent); }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="4" data-width="1280" data-height="720">
+      <div id="stage" class="clip">
+        <div id="heading"></div>
+        <div class="gm-bar" id="bar"></div>
+        <div id="caption"></div>
+        <div id="plot"><svg id="svg" viewBox="0 0 1072 420" preserveAspectRatio="xMidYMid meet"></svg></div>
+      </div>
+      <div id="footer" class="gm-footer"></div>
+    </div>
+    <script>
+      (function () {
+        var NS = "http://www.w3.org/2000/svg";
+        var p = GM.payload();
+        GM.setLang(p);
+        GM.chrome(p);
+        GM.text(document.getElementById("heading"), p.heading);
+        var cap = document.getElementById("caption");
+        GM.text(cap, p.caption);
+        if (!p.caption) cap.style.display = "none";
+        var svg = document.getElementById("svg");
+        function node(tag, attrs, txt) {
+          var e = document.createElementNS(NS, tag);
+          for (var k in attrs) e.setAttribute(k, attrs[k]);
+          if (txt !== undefined) e.textContent = String(txt);
+          svg.appendChild(e);
+          return e;
+        }
+        var X = p.x || [0, 1, 1], Y = p.y || [0, 1, 1];
+        var L = 70, R = 1040, T = 16, B = 360;
+        function sx(x) { return L + (x - X[0]) / ((X[1] - X[0]) || 1) * (R - L); }
+        function sy(y) { return B - (y - Y[0]) / ((Y[1] - Y[0]) || 1) * (B - T); }
+        function fmt(v) { var r = Math.round(v * 1000) / 1000; return String(r); }
+        var axes = [];
+        var y0 = (Y[0] <= 0 && Y[1] >= 0) ? sy(0) : B, x0 = (X[0] <= 0 && X[1] >= 0) ? sx(0) : L;
+        axes.push(node("line", { x1: L, y1: y0, x2: R, y2: y0, stroke: "#5f6368", "stroke-width": 2 }));
+        axes.push(node("line", { x1: x0, y1: T, x2: x0, y2: B, stroke: "#5f6368", "stroke-width": 2 }));
+        var n, v;
+        for (n = 0; n <= 14; n++) {
+          v = X[0] + n * X[2]; if (v > X[1] + 1e-9) break;
+          axes.push(node("line", { x1: sx(v), y1: y0 - 6, x2: sx(v), y2: y0 + 6, stroke: "#5f6368", "stroke-width": 2 }));
+          if (Math.abs(v) > 1e-12 || x0 !== sx(0)) axes.push(node("text", { x: sx(v), y: y0 + 32, "text-anchor": "middle", "class": "tick" }, fmt(v)));
+        }
+        for (n = 0; n <= 14; n++) {
+          v = Y[0] + n * Y[2]; if (v > Y[1] + 1e-9) break;
+          axes.push(node("line", { x1: x0 - 6, y1: sy(v), x2: x0 + 6, y2: sy(v), stroke: "#5f6368", "stroke-width": 2 }));
+          if (Math.abs(v) > 1e-12 || y0 !== sy(0)) axes.push(node("text", { x: x0 - 14, y: sy(v) + 6, "text-anchor": "end", "class": "tick" }, fmt(v)));
+        }
+        axes.push(node("text", { x: R + 16, y: y0 + 7, "class": "axl" }, p.x_label || "x"));
+        axes.push(node("text", { x: x0, y: T - 14, "text-anchor": "middle", "class": "axl" }, p.y_label || "y"));
+        var paths = [], last = null;
+        (Array.isArray(p.segments) ? p.segments : []).forEach(function (seg) {
+          if (!Array.isArray(seg) || seg.length < 2) return;
+          var d = seg.map(function (pt, i) { return (i ? "L" : "M") + sx(pt[0]).toFixed(1) + " " + sy(pt[1]).toFixed(1); }).join(" ");
+          paths.push(node("path", { d: d, fill: "none", stroke: "#1a73e8", "stroke-width": 5, "stroke-linecap": "round", "stroke-linejoin": "round" }));
+          last = seg[seg.length - 1];
+        });
+        var lab = null;
+        if (p.label && last) {
+          lab = node("text", { x: Math.min(sx(last[0]), R - 10), y: Math.max(sy(last[1]) - 18, T + 24), "text-anchor": "end", "class": "lab" }, p.label);
+        }
+        GM.layout(function () {
+          GM.fit(document.getElementById("heading"), document.getElementById("heading"), 44, 28);
+        }, [p.heading, p.caption, p.label, p.footer].join(" "));
+
+        var tl = gsap.timeline({ paused: true });
+        tl.fromTo("#heading", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 0.1);
+        tl.fromTo("#bar", { scaleX: 0, transformOrigin: "0% 50%" }, { scaleX: 1, duration: 0.5, ease: "power2.inOut" }, 0.4);
+        tl.fromTo("#caption", { opacity: 0 }, { opacity: 1, duration: 0.5 }, 0.5);
+        tl.fromTo(axes, { opacity: 0 }, { opacity: 1, duration: 0.6, stagger: 0.004 }, 0.5);
+        var per = paths.length ? 1.4 / paths.length : 0;
+        paths.forEach(function (pth, i) {
+          var len = pth.getTotalLength ? pth.getTotalLength() : 2000;
+          pth.style.strokeDasharray = len + " " + len;
+          tl.fromTo(pth, { strokeDashoffset: len }, { strokeDashoffset: 0, duration: per, ease: "none" }, 1.1 + i * per);
+        });
+        if (lab) tl.fromTo(lab, { opacity: 0 }, { opacity: 1, duration: 0.4 }, 2.5);
+        tl.fromTo("#footer", { opacity: 0 }, { opacity: 1, duration: 0.5 }, 0.6);
+        window.__timelines = window.__timelines || {};
+        window.__timelines["main"] = tl;   // static registration (the linter looks for this literal)
+        window.__gmTimeline = tl;          // used by tools/fallback_render.mjs
+      })();
+    </script>
+  </body>
+</html>

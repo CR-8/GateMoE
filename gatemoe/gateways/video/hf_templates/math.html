@@ -1,0 +1,77 @@
+<!doctype html>
+<!-- GateMoE template: equation steps (the HyperFrames twin of Manim's EquationBeat). Each step is an SVG
+     that Typst compiled in Python from checked math (safe_math.typst_svg); this page only shows images.
+     Steps appear one under another, earlier steps dim, the last one is boxed. Ends <= 3.0 s then holds.
+     payload = {"heading":str, "items":[{"svg":"data:image/svg+xml;base64,...", "caption":str?}],
+                "footer":str?, "index":int?, "total":int?, "lang":"en", "dir":"ltr"} -->
+<html lang="en" data-composition-variables='[{"id":"payload","type":"string","label":"Scene payload (JSON)","default":"{\"heading\":\"Equation\",\"items\":[]}"}]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1280, height=720" />
+    <link rel="stylesheet" href="assets/base.css" />
+    <script src="assets/gsap.min.js"></script>
+    <script src="assets/gm.js"></script>
+    <style>
+      #stage { display: flex; flex-direction: column; padding: 56px 112px 88px; gap: 26px; }
+      #heading { font-size: 48px; font-weight: 700; line-height: 1.25; }
+      #list { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 18px; }
+      .eq { display: flex; align-items: center; gap: 28px; padding: 8px 18px; border: 2px solid transparent; border-radius: 16px; }
+      .eq img { display: block; max-width: 760px; max-height: 120px; }
+      .cap { font-size: 24px; color: var(--gm-muted); line-height: 1.4; max-width: 420px; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="4" data-width="1280" data-height="720">
+      <div id="stage" class="clip">
+        <div id="heading"></div>
+        <div class="gm-bar" id="bar"></div>
+        <div id="list"></div>
+      </div>
+      <div id="footer" class="gm-footer"></div>
+    </div>
+    <script>
+      (function () {
+        var p = GM.payload();
+        GM.setLang(p);
+        GM.chrome(p);
+        GM.text(document.getElementById("heading"), p.heading);
+        var items = (Array.isArray(p.items) ? p.items : []).slice(0, 6), rows = [];
+        var list = document.getElementById("list");
+        items.forEach(function (it) {
+          var src = String(it && it.svg || "");
+          if (src.indexOf("data:image/svg+xml;base64,") !== 0) return;
+          var row = GM.el("div", "eq");
+          var img = document.createElement("img");
+          img.setAttribute("src", src);
+          img.setAttribute("alt", "");
+          // more steps -> smaller lines, so 1-6 steps always fit
+          img.style.maxHeight = [120, 120, 110, 96, 80, 68, 60][items.length] + "px";
+          row.appendChild(img);
+          if (it.caption) row.appendChild(GM.el("div", "cap", it.caption));
+          list.appendChild(row);
+          rows.push(row);
+        });
+        GM.layout(function () {
+          GM.fit(document.getElementById("heading"), document.getElementById("heading"), 48, 30);
+        }, [p.heading, p.footer].concat(items.map(function (i) { return i && i.caption; })).join(" "));
+
+        var tl = gsap.timeline({ paused: true });
+        tl.fromTo("#heading", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 0.1);
+        tl.fromTo("#bar", { scaleX: 0, transformOrigin: "0% 50%" }, { scaleX: 1, duration: 0.5, ease: "power2.inOut" }, 0.4);
+        var n = Math.max(rows.length, 1), first = 0.7, step = Math.min(0.6, (2.6 - first) / n);
+        rows.forEach(function (r, i) {
+          tl.fromTo(r, { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.45, ease: "power2.out" }, first + i * step);
+          if (i > 0) tl.to(rows[i - 1], { opacity: 0.45, duration: 0.3 }, first + i * step);
+        });
+        // box the result: a tween (not a callback), so frame-by-frame seeking renders it deterministically
+        if (rows.length) tl.fromTo(rows[rows.length - 1], { borderColor: "rgba(26,115,232,0)", backgroundColor: "rgba(255,255,255,0)" },
+                                   { borderColor: "rgba(26,115,232,1)", backgroundColor: "rgba(255,255,255,1)", duration: 0.35 },
+                                   Math.min(2.6, first + n * step));
+        tl.fromTo("#footer", { opacity: 0 }, { opacity: 1, duration: 0.5 }, 0.6);
+        window.__timelines = window.__timelines || {};
+        window.__timelines["main"] = tl;   // static registration (the linter looks for this literal)
+        window.__gmTimeline = tl;          // used by tools/fallback_render.mjs
+      })();
+    </script>
+  </body>
+</html>

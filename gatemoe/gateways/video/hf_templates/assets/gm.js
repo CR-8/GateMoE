@@ -75,6 +75,23 @@
     }
     return p;
   }
+  /* Frame chrome shared by every template (and drawn the same way by the Manim theme):
+     lesson name bottom-left, "3 / 9" bottom-right, thin progress line along the bottom edge. */
+  function chrome(p) {
+    var foot = document.getElementById("footer");
+    if (foot) {
+      foot.textContent = "";
+      foot.appendChild(el("span", "gm-ftext", p.footer || ""));
+      var idx = Number(p.index) || 0, tot = Number(p.total) || 0;
+      if (tot > 0 && idx > 0) foot.appendChild(el("span", "gm-count", idx + " / " + tot));
+    }
+    var idx2 = Number(p.index) || 0, tot2 = Number(p.total) || 0, root = document.getElementById("root");
+    if (root && tot2 > 0 && idx2 > 0 && !document.getElementById("gm-progress")) {
+      var track = el("div"); track.id = "gm-progress";
+      var fill = el("div"); fill.style.width = Math.max(0, Math.min(100, 100 * idx2 / tot2)) + "%";
+      track.appendChild(fill); root.appendChild(track);
+    }
+  }
   window.GM = { vars: vars, payload: payload, text: text, el: el, setLang: setLang, fit: fit,
-                register: register, layout: layout };
+                register: register, layout: layout, chrome: chrome };
 })();

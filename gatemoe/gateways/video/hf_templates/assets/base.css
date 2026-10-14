@@ -31,12 +31,18 @@
   --gm-font: "GMSans", "GMDeva", "GMKnda", "GMTaml", "GMTelu", "GMBeng", "GMGujr",
              "GMGuru", "GMMlym", "GMOrya", "GMArab", "GMMath", sans-serif;
   --gm-mono: "GMMono", "GMSans", "GMDeva", "GMKnda", "GMTaml", "GMTelu", monospace;
-  --gm-bg: #0f172a;
-  --gm-panel: #1e293b;
-  --gm-fg: #f1f5f9;
-  --gm-muted: #94a3b8;
-  --gm-accent: #38bdf8;
-  --gm-accent2: #f59e0b;
+  /* GateMoE design system: light canvas, charcoal ink, one blue accent (same as the Manim theme) */
+  --gm-bg: #f8f9fa;        /* canvas */
+  --gm-panel: #ffffff;     /* card surface */
+  --gm-fg: #202124;        /* charcoal ink */
+  --gm-graphite: #3c4043;
+  --gm-muted: #5f6368;     /* slate */
+  --gm-mist: #dadce0;      /* hairlines */
+  --gm-tint: #e8f0fe;      /* feature-panel tint */
+  --gm-accent: #1a73e8;    /* Google blue */
+  --gm-accent-deep: #1967d2;
+  --gm-accent2: #e8f0fe;   /* chips / tags */
+  --gm-good: #188038;      /* success only */
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body {
@@ -46,7 +52,12 @@ html, body {
 }
 #root { position: relative; width: 1280px; height: 720px; overflow: hidden; }
 .clip { position: absolute; inset: 0; }
-.gm-heading { font-weight: 700; font-size: 52px; line-height: 1.25; color: var(--gm-fg); }
+.gm-heading { font-weight: 700; font-size: 52px; line-height: 1.25; color: var(--gm-fg); letter-spacing: -0.005em; }
 .gm-sub { font-weight: 400; font-size: 30px; line-height: 1.4; color: var(--gm-muted); }
 .gm-bar { height: 6px; width: 120px; background: var(--gm-accent); border-radius: 3px; }
-.gm-footer { position: absolute; left: 64px; right: 64px; bottom: 28px; font-size: 18px; color: var(--gm-muted); }
+.gm-footer { position: absolute; left: 64px; right: 64px; bottom: 26px; font-size: 18px; color: var(--gm-muted);
+             display: flex; justify-content: space-between; gap: 24px; letter-spacing: 0.01em; }
+.gm-footer .gm-ftext { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.gm-footer .gm-count { flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+#gm-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 6px; background: var(--gm-mist); }
+#gm-progress > div { height: 100%; background: var(--gm-accent); }

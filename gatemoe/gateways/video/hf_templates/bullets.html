@@ -9,13 +9,13 @@
     <script src="assets/gsap.min.js"></script>
     <script src="assets/gm.js"></script>
     <style>
-      #stage { display: flex; flex-direction: column; padding: 64px 96px 80px; gap: 30px; }
+      #stage { display: flex; flex-direction: column; padding: 56px 112px 88px; gap: 26px; }
       #heading { font-size: 50px; font-weight: 700; line-height: 1.3; }
       #list { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 0.7em;
               font-size: 34px; line-height: 1.45; overflow: hidden; }
       .item { display: flex; align-items: flex-start; gap: 0.7em; }
       .dot { flex: 0 0 auto; width: 1.4em; height: 1.4em; margin-top: 0.05em; border-radius: 50%;
-             background: var(--gm-accent); color: #0f172a; font-weight: 700; font-size: 0.7em;
+             background: var(--gm-accent); color: #ffffff; font-weight: 700; font-size: 0.7em;
              display: flex; align-items: center; justify-content: center; line-height: 1; }
       .txt { flex: 1; min-width: 0; overflow-wrap: anywhere; }
     </style>
@@ -35,7 +35,7 @@
         GM.setLang(p);
         var bullets = (Array.isArray(p.bullets) ? p.bullets : []).slice(0, 6);
         GM.text(document.getElementById("heading"), p.heading);
-        GM.text(document.getElementById("footer"), p.footer);
+        GM.chrome(p);
         var list = document.getElementById("list");
         bullets.forEach(function (b, i) {
           var row = GM.el("div", "item");

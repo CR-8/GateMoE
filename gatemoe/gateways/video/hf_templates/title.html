@@ -9,17 +9,15 @@
     <script src="assets/gsap.min.js"></script>
     <script src="assets/gm.js"></script>
     <style>
-      #stage { display: flex; flex-direction: column; justify-content: center; padding: 40px 96px 70px; gap: 22px; }
-      #kicker { font-size: 26px; font-weight: 700; letter-spacing: 0.06em; color: var(--gm-accent); }
-      #title { font-size: 68px; font-weight: 700; line-height: 1.3; max-height: 380px; }
+      #stage { display: flex; flex-direction: column; justify-content: center; padding: 40px 112px 80px; gap: 22px; }
+      #kicker { align-self: flex-start; font-size: 22px; font-weight: 700; letter-spacing: 0.02em; color: var(--gm-accent-deep);
+                background: var(--gm-tint); padding: 6px 18px; border-radius: 200px; }
+      #title { font-size: 68px; font-weight: 700; line-height: 1.3; letter-spacing: -0.01em; max-height: 380px; }
       #subtitle { font-size: 32px; color: var(--gm-muted); line-height: 1.5; max-width: 1088px; }
-      #glow { position: absolute; width: 900px; height: 900px; right: -300px; top: -260px; border-radius: 50%;
-              background: radial-gradient(circle, rgba(56,189,248,0.22), rgba(56,189,248,0) 65%); }
     </style>
   </head>
   <body>
     <div id="root" data-composition-id="main" data-start="0" data-duration="4" data-width="1280" data-height="720">
-      <div id="glow"></div>
       <div id="stage" class="clip">
         <div id="kicker"></div>
         <div id="title"></div>
@@ -32,7 +30,8 @@
       (function () {
         var p = GM.payload();
         GM.setLang(p);
-        ["kicker", "title", "subtitle", "footer"].forEach(function (id) {
+        GM.chrome(p);
+        ["kicker", "title", "subtitle"].forEach(function (id) {
           var e = document.getElementById(id);
           GM.text(e, p[id]);
           if (!p[id]) e.style.display = "none";
@@ -42,7 +41,6 @@
         }, [p.kicker, p.title, p.subtitle, p.footer].join(" "));
 
         var tl = gsap.timeline({ paused: true });
-        tl.fromTo("#glow", { opacity: 0, scale: 0.8 }, { opacity: 1, scale: 1, duration: 1.6, ease: "power2.out" }, 0);
         tl.fromTo("#kicker", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 0.2);
         tl.fromTo("#title", { opacity: 0, y: 36 }, { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" }, 0.35);
         tl.fromTo("#bar", { scaleX: 0, transformOrigin: "0% 50%" }, { scaleX: 1, duration: 0.7, ease: "power2.inOut" }, 0.9);
