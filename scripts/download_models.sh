@@ -53,6 +53,10 @@ if [ "${SKIP_ZIMS:-0}" != 1 ]; then
     file="$(printf '%s' "$listing" | grep -o "${prefix}_[0-9]\{4\}-[0-9]\{2\}\.zim" | sort -u | tail -1)"
     if [ -z "$file" ]; then echo "skip $prefix (not found)"; continue; fi
     get "https://download.kiwix.org/zim/${project}/${file}" "$DATA_DIR/zim/${file}"
+    # a newer Kiwix snapshot replaces the older one (two dates of one archive would be searched twice)
+    for old in "$DATA_DIR"/zim/"${prefix}"_[0-9][0-9][0-9][0-9]-[0-9][0-9].zim; do
+      [ -e "$old" ] && [ "$(basename "$old")" != "$file" ] && { echo "drop $old (superseded by $file)"; rm -f "$old"; }
+    done
   done
 fi
 du -sh "$MODELS" "$DATA_DIR/zim" 2>/dev/null || true
