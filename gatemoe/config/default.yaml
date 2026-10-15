@@ -85,6 +85,8 @@ knowledge:
   passage_words: 200
   max_source_chars: 6000   # hard cap on SOURCES text (keeps Pi prefill time bounded)
   include_english: true    # also search English ZIMs for non-English requests
+  max_zims_per_language: 3 # archives searched per language and lesson
+  select: probe            # probe: archives whose titles match the lesson's terms | size: subject, then largest
   delta: true              # also search the KDD delta archives (gatemoe_delta_<lang>_*.zim, see `gatemoe kdd`)
 
 # Knowledge updates (KDD). Snapshot layer = Kiwix archives (refresh: `gatemoe kdd snapshots --apply`);

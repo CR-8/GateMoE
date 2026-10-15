@@ -176,6 +176,8 @@ def cmd_kdd(args, cfg) -> int:
         return kdd.cmd_gaps(cfg, args.dirs, args.json)
     if args.action == "snapshots":
         return kdd.cmd_update(cfg, apply=args.apply, add=args.add)
+    if args.action == "fields":
+        return kdd.cmd_fields(cfg, count=args.count, max_gb=args.max_gb, lang=args.lang, apply=args.apply)
     from .knowledge.delta import DeltaKDD, fetch_arxiv, read_inbox
 
     d = DeltaKDD(cfg)
@@ -236,11 +238,14 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--roles", default="router,generator")
     s.add_argument("--repeats", type=int, default=3)
 
-    s = sub.add_parser("kdd", help="knowledge updates: gaps, snapshots, ingest/build/prune the delta, status")
-    s.add_argument("action", choices=["gaps", "snapshots", "ingest", "build", "run", "prune", "status"])
+    s = sub.add_parser("kdd", help="knowledge updates: gaps, snapshots, fields (subject archive pack), ingest/build/prune the delta, status")
+    s.add_argument("action", choices=["gaps", "snapshots", "fields", "ingest", "build", "run", "prune", "status"])
     s.add_argument("dirs", nargs="*", help="gaps/ingest: folders with lesson.json files (default: jobs_dir)")
     s.add_argument("--json", action="store_true", help="gaps: machine-readable output")
-    s.add_argument("--apply", action="store_true", help="snapshots: download, verify and swap in newer snapshots")
+    s.add_argument("--apply", action="store_true", help="snapshots/fields: download, verify and install")
+    s.add_argument("--count", type=int, default=50, help="fields: how many subject archives to add (default 50)")
+    s.add_argument("--max-gb", type=float, default=60.0, help="fields: disk budget for the new archives (default 60)")
+    s.add_argument("--lang", default="en", help="fields: language of the archives (default en)")
     s.add_argument("--add", nargs="*", help="snapshots: archive prefixes to add, e.g. libretexts.org_en_bio")
     s.add_argument("--no-arxiv", action="store_true", help="ingest/run: inbox only")
     s.add_argument("--categories", help="ingest/run: arXiv categories, e.g. cs.RO,eess.SY")

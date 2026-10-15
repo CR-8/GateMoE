@@ -62,6 +62,7 @@ starts the web app as a service. Details, instance sizes and access options: [do
 | `gatemoe doctor` | checks models, voices, video engines, ZIMs, fonts, RAM |
 | `gatemoe catalog` | lists offline knowledge archives |
 | `gatemoe swapbench` | measures model load/unload (swap) cost |
+| `gatemoe kdd fields [--count 50 --max-gb 60] [--apply]` | add a pack of subject archives (Wikipedia topic selections, LibreTexts, academic Stack Exchange) from the live Kiwix catalogue |
 | `gatemoe kdd gaps \| snapshots \| run \| prune \| status` | knowledge updates: usage-gap mining, Kiwix snapshot refresh, KDD delta layer (new research between snapshots) |
 | `python scripts/analyze_jobs.py <jobs_dir>` | theoretical vs realised savings across lessons |
 

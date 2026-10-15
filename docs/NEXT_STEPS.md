@@ -57,6 +57,9 @@ research). Status: built and tested against the fake server; waiting for the clo
   older `job.json` / `classroom.json` files are imported automatically on first start. No sample data ships.
   `gatemoe serve --no-generate` is a browse-and-grade console that never loads a model; `gatemoe import <dir>`
   puts finished lesson folders (e.g. the paper-1 campaign's) on the board in place.
+* Generation while the campaign runs: a second VM (`scripts/gcp_generation_node.sh`, docs/CLOUD.md section 7)
+  with the knowledge pack `gatemoe kdd fields` (up to 50 subject archives). Archive choice per lesson is now
+  `knowledge.select: probe` (title matches); the campaign measured the earlier rule, `knowledge.select: size`.
 * Merge into `main` after the paper-1 campaign has finished: do not re-run setup on the campaign VM before.
 * Not yet: accounts/roles (a node is a trusted LAN appliance), editing generated content in the UI,
   exporting grades as CSV.

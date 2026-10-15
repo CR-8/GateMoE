@@ -30,6 +30,12 @@ SUBJECT_HINTS = {
 }
 
 
+def _general(name: str) -> bool:
+    """Archives covering everything (not one field): wikipedia_en_all_nopic, libretexts k12, ..."""
+    n = name.lower()
+    return (n.startswith("wikipedia_") and ("_all" in n or "_top" in n)) or "k12" in n
+
+
 def is_delta(name: str) -> bool:
     """Archives compiled by the KDD pipeline (gatemoe/knowledge/kdd.py) from new knowledge."""
     return name.lower().startswith("gatemoe_delta")
@@ -169,27 +175,62 @@ class KnowledgeBase:
         item = entry.get_item()
         return bytes(item.content), item.mimetype, entry.path
 
-    def select(self, lang: str, subject: str) -> list[dict]:
-        """Which collections to search (learner language first, then English), subject-matching first."""
+    def select(self, lang: str, subject: str, probe: list[tuple[str, str]] | None = None) -> list[dict]:
+        """Which collections to search (learner language first, then English), at most
+        ``knowledge.max_zims_per_language`` per language.
+
+        With many archives installed (e.g. 50 subject selections) the lesson's own words decide:
+        ``knowledge.select: probe`` ranks archives by how many article titles match the lesson's
+        search terms (a cheap title-index lookup), plus a bonus for archives named after the
+        router's subject. ``size`` is the earlier rule (subject match, then the largest archives),
+        which the paper-1 campaign measured."""
         langs = [lang] + (["en"] if self.cfg["knowledge.include_english"] and lang != "en" else [])
         hints = SUBJECT_HINTS.get(subject, [])
         all_hints = {h for hs in SUBJECT_HINTS.values() for h in hs}
+        limit = int(self.cfg.get("knowledge.max_zims_per_language", 3))
+        use_probe = str(self.cfg.get("knowledge.select", "probe")) == "probe" and bool(probe)
 
         def fits(name: str) -> bool:   # general archives always; topical ones only for their subject
             name = name.lower()
             return not hints or any(h in name for h in hints) or not any(h in name for h in all_hints)
 
+        def hinted(z: dict) -> bool:
+            return any(h in z["name"].lower() for h in hints)
+
         chosen = []
         use_delta = bool(self.cfg.get("knowledge.delta", True))
         for lg in langs:
             zims = [z for z in self.catalog()
-                    if z.get("lang") == lg and "error" not in z and z.get("kind") == "text" and fits(z["name"])
-                    and not is_delta(z["name"])]
-            zims.sort(key=lambda z: (not any(h in z["name"].lower() for h in hints), -z.get("size_mb", 0)))
-            chosen += zims[: int(self.cfg.get("knowledge.max_zims_per_language", 3))]
+                    if z.get("lang") == lg and "error" not in z and z.get("kind") == "text"
+                    and (use_probe or fits(z["name"])) and not is_delta(z["name"])]
+            if use_probe and len(zims) > limit:
+                terms = [q for q, ql in probe if ql == lg and q.strip()][:4]
+                score = {z["file"]: self._title_hits(z, terms) + (3 if hinted(z) else 0) for z in zims}
+                zims.sort(key=lambda z: (-score[z["file"]], -z.get("size_mb", 0)))
+                # archives that matched first; empty slots go to general archives (a whole-language
+                # Wikipedia, K-12 libraries), never to a topic archive that matched nothing
+                zims = [z for z in zims if score[z["file"]] > 0] + \
+                       [z for z in zims if score[z["file"]] == 0 and _general(z["name"])]
+            else:
+                zims = [z for z in zims if fits(z["name"])]
+                zims.sort(key=lambda z: (not hinted(z), -z.get("size_mb", 0)))
+            chosen += zims[:limit]
             if use_delta:   # the KDD delta layer (new knowledge between snapshots) is always searched too
                 chosen += [z for z in self.catalog() if z.get("lang") == lg and "error" not in z and is_delta(z["name"])]
         return chosen
+
+    def _title_hits(self, z: dict, terms: list[str], cap: int = 10) -> int:
+        """How many article titles in ``z`` match the terms (title suggestions; no full-text search)."""
+        from libzim.suggestion import SuggestionSearcher
+
+        total = 0
+        try:
+            s = SuggestionSearcher(self._archive(z["file"]))
+            for term in terms:
+                total += min(cap, s.suggest(term[:80]).getEstimatedMatches())
+        except Exception:
+            return 0
+        return total
 
     # -- search ------------------------------------------------------------------------------
     def _search_one(self, z: dict, query: str, k: int, relax: bool = True) -> list[str]:
@@ -260,7 +301,7 @@ class KnowledgeBase:
     def search(self, queries: list[tuple[str, str]], learner_lang: str, subject: str = "other",
                events: EventLog | None = None) -> list[dict]:
         t0 = time.perf_counter()
-        zims = self.select(learner_lang, subject)
+        zims = self.select(learner_lang, subject, probe=queries)
         if not zims:
             if events:
                 events.emit("kb_search", zims=[], passages=0, note="no ZIM archives installed")

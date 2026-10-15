@@ -184,3 +184,23 @@ sudo -u gatemoe bash -c 'set -a; . /etc/gatemoe.env; cd /opt/gatemoe/GateMoE
 
 Run each lesson request with `--mode clef` and `--mode all` and compare with
 `scripts/analyze_jobs.py` (theoretical vs realised savings - the project's research question).
+
+## 7. A second node that generates lessons (next to a running benchmark)
+
+A benchmark VM must not generate lessons on the side: a second large model would not fit in its RAM
+and would distort its timings. Add a generation node instead (Cloud Shell):
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/CR-8/GateMoE/ui-classroom-redesign/scripts/gcp_generation_node.sh
+ZONE=us-central1-a PASSWORD=YourWebPassword1 bash gcp_generation_node.sh up
+ZONE=us-central1-a bash gcp_generation_node.sh status        # repeat until "web app: active"
+```
+
+It creates `gatemoe-gen` (e2-standard-4, 16 GB, 150 GB disk), installs GateMoE unattended, then adds a
+pack of up to 50 subject archives from the live Kiwix catalogue (`gatemoe kdd fields --count 50
+--max-gb 60 --apply`: Wikipedia topic selections first, then LibreTexts libraries, then Stack Exchange
+sites of academic fields). With many archives installed, each lesson searches the archives whose
+article titles match its terms (`knowledge.select: probe`). `stop` / `start` pause it (only the disk
+is billed when stopped); `down` deletes it.
+
+To see what the pack would install, without downloading: `gatemoe kdd fields` on any node.

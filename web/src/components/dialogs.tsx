@@ -51,19 +51,36 @@ function NewLessonDialog({ open, onOpenChange }: { open: boolean; onOpenChange: 
   const [mode, setMode] = React.useState("clef");
   const [gws, setGws] = React.useState<Gateway[]>(["notes", "quiz"]);
   const [busy, setBusy] = React.useState(false);
+  const [perLine, setPerLine] = React.useState(false);
+  const lines = request.split("\n").map((s) => s.trim()).filter(Boolean);
+  const many = perLine && lines.length > 1;
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!request.trim()) return;
     setBusy(true);
+    const todo = many ? lines : [request];
+    let queued = 0;
+    let first = "";
     try {
-      const job = await api.create({ request, language, mode, gateways: mode === "manual" ? gws : null });
+      for (const r of todo) {        // the server queues them; one lesson is generated at a time
+        const job = await api.create({ request: r, language, mode, gateways: mode === "manual" ? gws : null });
+        first ||= job.id;
+        queued += 1;
+      }
+    } catch (err) {
+      toast.error(queued ? `${queued} queued, then: ${(err as Error).message}` : (err as Error).message);
+    } finally {
+      setBusy(false);
       await refreshLessons();
+    }
+    if (queued === todo.length) {
       onOpenChange(false);
       setRequest("");
-      toast("Lesson queued", { action: { label: "Open", onClick: () => go(`/lesson/${job.id}`) } });
-    } catch (err) {
-      toast.error((err as Error).message);
-    } finally { setBusy(false); }
+      toast(queued > 1 ? `${queued} lessons queued` : "Lesson queued",
+        queued === 1 ? { action: { label: "Open", onClick: () => go(`/lesson/${first}`) } } : undefined);
+    } else if (queued) {
+      setRequest(todo.slice(queued).join("\n"));     // keep the ones that were not accepted
+    }
   };
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -79,6 +96,12 @@ function NewLessonDialog({ open, onOpenChange }: { open: boolean; onOpenChange: 
               <Textarea id="req" autoFocus value={request} onChange={(e) => setRequest(e.target.value)} maxLength={2000}
                 placeholder="e.g. Explain refraction of light for class 8, with flashcards and a podcast"
                 onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void submit(e); }} />
+              {lines.length > 1 && (
+                <label className="flex cursor-pointer items-center gap-2 text-body-sm text-graphite">
+                  <Checkbox checked={perLine} onCheckedChange={(c) => setPerLine(!!c)} />
+                  One lesson per line <span className="text-slate">({lines.length} lessons, generated one after another)</span>
+                </label>
+              )}
               {recent.length > 0 && (
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="text-caption text-slate">Recent:</span>
@@ -134,7 +157,7 @@ function NewLessonDialog({ open, onOpenChange }: { open: boolean; onOpenChange: 
           </DialogBody>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" disabled={busy || !request.trim() || (mode === "manual" && !gws.length)}>Generate</Button>
+            <Button type="submit" disabled={busy || !request.trim() || (mode === "manual" && !gws.length)}>{many ? `Generate ${lines.length}` : "Generate"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
