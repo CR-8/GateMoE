@@ -2,7 +2,7 @@
 # A second GateMoE node on Google Cloud that GENERATES lessons, while the first VM keeps running
 # a benchmark untouched. Run in Google Cloud Shell (the >_ icon at the top right of the console):
 #
-#   ZONE=us-central1-a PASSWORD=YourWebPassword1 bash gcp_generation_node.sh up
+#   PASSWORD='YourWebPassword1' bash gcp_generation_node.sh up   # zone: that of gatemoe-demo (or ZONE=...)
 #   ZONE=us-central1-a bash gcp_generation_node.sh status     # install progress, address, knowledge pack
 #   ZONE=us-central1-a bash gcp_generation_node.sh stop       # pause (only the disk is billed)
 #   ZONE=us-central1-a bash gcp_generation_node.sh start
@@ -20,7 +20,9 @@
 # Free-trial accounts may run 8 vCPUs in total: 2 (a benchmark e2-standard-2) + 4 here fits.
 set -euo pipefail
 NAME="${NAME:-gatemoe-gen}"
-ZONE="${ZONE:?set ZONE=<zone, e.g. the one of your first VM: us-central1-a>}"
+NEXT_TO="${NEXT_TO:-gatemoe-demo}"            # default zone: the one of this VM (your first node), if it exists
+ZONE="${ZONE:-$(gcloud compute instances list --filter="name=$NEXT_TO" --format='value(zone.basename())' 2>/dev/null | head -1)}"
+[ -n "$ZONE" ] || { echo "set ZONE=<zone>, e.g. ZONE=us-central1-a (or check: gcloud config get-value project)"; exit 1; }
 TYPE="${TYPE:-e2-standard-4}"
 DISK_GB="${DISK_GB:-150}"
 REF="${REF:-ui-classroom-redesign}"
@@ -34,17 +36,20 @@ ip_of() { gcloud compute instances describe "$NAME" --zone "$ZONE" --format='val
 
 case "${1:-}" in
 up)
-  PASSWORD="${PASSWORD:?set PASSWORD=<web login password, letters and digits, 10+ characters>}"
-  [[ "$PASSWORD" =~ ^[A-Za-z0-9]{10,64}$ ]] || { echo "PASSWORD: use 10-64 letters and digits"; exit 1; }
+  PASSWORD="${PASSWORD:?set PASSWORD=<web login password, 8+ characters>}"
+  case "$PASSWORD" in *"'"*|*$'\n'*) echo "PASSWORD: anything but quotes (') and line breaks"; exit 1;; esac
+  [ "${#PASSWORD}" -ge 8 ] || { echo "PASSWORD: at least 8 characters"; exit 1; }
   [[ "$LANGS" =~ ^[a-z\ ]*$ && "$REF" =~ ^[A-Za-z0-9._/-]+$ ]] || { echo "bad LANGS or REF"; exit 1; }
-  STARTUP="$(mktemp)"
+  STARTUP="$(mktemp)"; PWFILE="$(mktemp)"
+  printf '%s' "$PASSWORD" > "$PWFILE"       # handed over as instance metadata: any characters survive
   cat > "$STARTUP" <<EOF
 #!/bin/bash
 # runs at every boot: installs once, then (re)starts the subject-archive pack until it is complete
 exec >>/var/log/gatemoe-node.log 2>&1
 echo "== boot \$(date -u +%FT%TZ)"
 if [ ! -f /opt/gatemoe/.node-ready ]; then
-  curl -fsSL "$RAW" | GATEMOE_REF="$REF" GATEMOE_PASSWORD="$PASSWORD" LANGS="$LANGS" bash \
+  PW="\$(curl -fs -H 'Metadata-Flavor: Google' http://metadata.google.internal/computeMetadata/v1/instance/attributes/gatemoe-password)"
+  curl -fsSL "$RAW" | GATEMOE_REF="$REF" GATEMOE_PASSWORD="\$PW" LANGS="$LANGS" bash \
     && touch /opt/gatemoe/.node-ready || { echo "== install failed; it resumes at the next boot"; exit 1; }
 fi
 if [ ! -f /opt/gatemoe/.fields-done ]; then
@@ -61,8 +66,8 @@ EOF
   gcloud compute instances create "$NAME" --zone "$ZONE" --machine-type "$TYPE" \
     --image-family ubuntu-2404-lts-amd64 --image-project ubuntu-os-cloud \
     --boot-disk-size "${DISK_GB}GB" --boot-disk-type pd-balanced --tags "$TAG" \
-    --metadata-from-file startup-script="$STARTUP"
-  rm -f "$STARTUP"
+    --metadata-from-file startup-script="$STARTUP",gatemoe-password="$PWFILE"
+  rm -f "$STARTUP" "$PWFILE"
   echo
   echo "Created $NAME. It installs itself now (30-60 min). Follow it with:"
   echo "  ZONE=$ZONE bash $0 status"
