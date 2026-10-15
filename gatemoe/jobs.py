@@ -98,16 +98,33 @@ class JobManager:
 
     def _load_existing(self) -> None:
         self._import_legacy_folders()
-        for r in self.db.all("SELECT * FROM jobs"):
-            job = Job(id=r["id"], request=r["request"], options=json.loads(r["options"] or "{}"), status=r["status"],
-                      created=r["created"], started=r["started"], finished=r["finished"], error=r["error"],
-                      stage=None)
-            if r["dir"]:
-                self._dirs[job.id] = r["dir"]
+        for job in self._adopt(self.db.all("SELECT * FROM jobs")):
             if job.status in ("queued", "running"):
                 job.status, job.error = "interrupted", "server restarted while this job was pending"
                 self._save(job)
-            self.jobs[job.id] = job
+
+    def _adopt(self, rows: list[dict]) -> list[Job]:
+        out = []
+        with self._lock:
+            for r in rows:
+                if r["id"] in self.jobs:
+                    continue
+                job = Job(id=r["id"], request=r["request"], options=json.loads(r["options"] or "{}"),
+                          status=r["status"], created=r["created"], started=r["started"], finished=r["finished"],
+                          error=r["error"], stage=None)
+                if r["dir"]:
+                    self._dirs[job.id] = r["dir"]
+                self.jobs[job.id] = job
+                out.append(job)
+        return out
+
+    def _sync(self) -> None:
+        """Pick up finished lessons another process added (``gatemoe import`` while the server runs)."""
+        ids = {r["id"] for r in self.db.all("SELECT id FROM jobs")} - set(self.jobs)
+        if ids:
+            marks = ",".join("?" * len(ids))
+            self._adopt(self.db.all(f"SELECT * FROM jobs WHERE id IN ({marks}) AND status NOT IN ('queued', 'running')",
+                                    tuple(ids)))
 
     def _import_legacy_folders(self) -> None:
         """Nodes before the database kept job.json (+ lesson.json) per folder: import them once."""
@@ -175,9 +192,12 @@ class JobManager:
         return job
 
     def get(self, job_id: str) -> Job:
+        if job_id not in self.jobs:
+            self._sync()
         return self.jobs[job_id]
 
     def list(self) -> list[Job]:
+        self._sync()
         return sorted(self.jobs.values(), key=lambda j: j.created, reverse=True)
 
     def events(self, job_id: str) -> EventLog | None:

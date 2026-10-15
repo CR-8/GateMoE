@@ -76,6 +76,11 @@ def test_import_registers_folders_in_place(cfg, tmp_path, capsys):
 
     client = TestClient(create_app(cfg, JobManager(cfg, NoPipeline)))
     (lesson,) = client.get("/api/lessons").json()
+    second = tmp_path / "later" / "en-02"                 # imported while the server is running
+    second.mkdir(parents=True)
+    (second / "lesson.json").write_text(json.dumps({**LESSON, "request": "Explain diodes"}))
+    assert cli_main(["--config", str(conf), "import", str(second)]) == 0
+    assert {x["request"] for x in client.get("/api/lessons").json()} == {"Explain Ohm's law", "Explain diodes"}
     assert lesson["status"] == "done" and lesson["counts"]["questions"] == 1
     assert client.get(f"/api/lessons/{lesson['id']}/files/notes.md").text == "# Ohm's law"   # served from the folder
     assert not list(cfg.path("paths.jobs_dir").glob(f"{lesson['id']}*"))                       # nothing copied
