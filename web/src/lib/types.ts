@@ -76,11 +76,13 @@ export interface TakeView {
 export interface AppConfig {
   languages: Record<string, { name: string; native: string; tts?: string }>; gateways: Gateway[];
   router_mode: string; threshold: number; models: Record<string, string>;
+  generate: boolean;      // false: browse, post and grade only (the server never loads a model)
+  classroom: { palette: string[]; kinds: Record<string, string>; points_per_question: number };
 }
 
 export interface SystemState {
   sys: { mem_total_mb: number; mem_available_mb: number; swap_used_mb: number; temp_c: number | null; throttled: string | null };
   models: { loaded: string | null; pid?: number | null; history?: { event: string; role: string; seconds?: number }[] };
   specialists: { id: string; gateway: string; available?: boolean; size_mb?: number | null; lang?: string; error?: string }[];
-  queue: number;
+  queue: number; generate?: boolean;
 }

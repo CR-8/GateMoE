@@ -56,14 +56,22 @@ sandbox, so the components were written by hand in `web/src/components/ui/` with
 | `#/knowledge` | Kiwix snapshot layer, KDD delta layer, update commands | |
 | `#/system` | memory, model in RAM, queue, temperature, specialists, configuration | |
 
+## Data
+
+Everything the console shows comes from the node's SQLite database (`paths.db`, default
+`<data_dir>/gatemoe.db`) through the REST API: lessons and their summaries, the roster, sections,
+posts, the feedback bank and submissions. Section colours, section types and points per question
+come from `/api/config`; the "Recent" shortcuts in the new-lesson dialog are this node's own
+recent requests. Media files (audio, video, PDF) stay in each lesson's folder.
+
 ## Working on the UI
 
 ```bash
 cd web && npm install
-python scripts/demo_ui.py --port 8000 &       # sample lessons, sections, grades; no models needed
+gatemoe serve --no-generate --port 8000 &     # your local database; never loads a model
+gatemoe import path/to/lesson-folders         # optional: put finished lessons on the board
 npm run dev                                   # Vite on :5173, proxies /api and /zim to :8000
 npm run build                                 # type-check + build into gatemoe/server/static (committed)
 ```
 
-The built files are committed, so nodes never need Node.js. `scripts/demo_ui.py --video <mp4>`
-shows a rendered video in the sample lesson.
+The built files are committed, so nodes never need Node.js.

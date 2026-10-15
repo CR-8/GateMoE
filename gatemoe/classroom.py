@@ -7,19 +7,22 @@
   grade points (e.g. "No working shown: -5"). Applying saved feedback to a submission adjusts its
   grade automatically; the quiz itself is auto-marked from the generated answer key.
 
-Storage: one JSON file next to the jobs folder (atomic writes, a lock for the single server
-process). No accounts: a node is a trusted LAN appliance; students are names on a roster.
+Storage: the node database (gatemoe/db.py). No accounts: a node is a trusted LAN appliance and
+students are names on a roster.
 """
 from __future__ import annotations
 
 import json
-import threading
 import time
 import uuid
 from pathlib import Path
 
+from .db import Database
+
 PALETTE = ["#1a73e8", "#188038", "#e37400", "#9334e6", "#d93025", "#007b83", "#b06000", "#5f6368"]
+KINDS = {"period": "Class period", "block": "Block", "club": "Club", "tutoring": "Tutoring group", "group": "Other group"}
 POINTS_PER_QUESTION = 2
+LESSON_STATUSES = ("review", "published", "archived")
 
 
 def _id() -> str:
@@ -30,197 +33,227 @@ class ClassroomError(ValueError):
     pass
 
 
+def _name(s, n: int = 80, what: str = "name") -> str:
+    s = " ".join(str(s or "").split())[:n]
+    if not s:
+        raise ClassroomError(f"{what} must not be empty")
+    return s
+
+
+def _points(v) -> float:
+    try:
+        p = float(v)
+    except (TypeError, ValueError):
+        raise ClassroomError("points must be a number") from None
+    if not -100 <= p <= 100:
+        raise ClassroomError("points must be between -100 and 100")
+    return round(p, 2)
+
+
 class Classroom:
-    def __init__(self, path: Path):
-        self.path = Path(path)
-        self.lock = threading.Lock()
-        self.data = self._load()
+    def __init__(self, db: Database, legacy_json: Path | None = None):
+        self.db = db
+        if legacy_json is not None:
+            self._import_legacy(Path(legacy_json))
 
-    # -- storage -------------------------------------------------------------------------------
-    def _empty(self) -> dict:
-        return {"students": [], "sections": [], "assignments": [], "feedback": [], "submissions": [],
-                "lesson_meta": {}}
-
-    def _load(self) -> dict:
-        try:
-            d = json.loads(self.path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            return self._empty()
-        base = self._empty()
-        base.update({k: v for k, v in d.items() if k in base})
-        return base
-
-    def _save(self) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(self.data, ensure_ascii=False, indent=1), encoding="utf-8")
-        tmp.replace(self.path)
-
+    # -- reading -------------------------------------------------------------------------------
     def snapshot(self) -> dict:
-        with self.lock:
-            return json.loads(json.dumps(self.data))
+        """Everything the console shows, in one consistent read."""
+        with self.db.lock:
+            q = self.db.all
+            members: dict[str, list[str]] = {}
+            for r in q("SELECT section_id, student_id FROM section_students ORDER BY position"):
+                members.setdefault(r["section_id"], []).append(r["student_id"])
+            posted_to: dict[str, list[str]] = {}
+            for r in q("SELECT assignment_id, section_id FROM assignment_sections ORDER BY position"):
+                posted_to.setdefault(r["assignment_id"], []).append(r["section_id"])
+            applied: dict[str, list[str]] = {}
+            for r in q("SELECT submission_id, feedback_id FROM submission_feedback ORDER BY position"):
+                applied.setdefault(r["submission_id"], []).append(r["feedback_id"])
+            return {
+                "students": q("SELECT id, name, created FROM students ORDER BY created, rowid"),
+                "sections": [{**s, "archived": bool(s["archived"]), "student_ids": members.get(s["id"], [])}
+                             for s in q("SELECT * FROM sections ORDER BY created, rowid")],
+                "assignments": [{**a, "section_ids": posted_to.get(a["id"], [])}
+                                for a in q("SELECT * FROM assignments ORDER BY posted, rowid")],
+                "feedback": q("SELECT * FROM feedback ORDER BY created, rowid"),
+                "submissions": [self._sub_out(s, applied.get(s["id"], []))
+                                for s in q("SELECT * FROM submissions ORDER BY submitted, rowid")],
+                "lesson_meta": {r["lesson_id"]: {"status": r["status"]}
+                                for r in q("SELECT lesson_id, status FROM lesson_status")},
+            }
 
     @staticmethod
-    def _find(items: list[dict], item_id: str, what: str) -> dict:
-        for it in items:
-            if it["id"] == item_id:
-                return it
-        raise KeyError(f"no such {what}")
+    def _sub_out(s: dict, feedback_ids: list[str]) -> dict:
+        return {**s, "answers": json.loads(s["answers"]), "correct": json.loads(s["correct"]),
+                "feedback_ids": feedback_ids}
 
-    @staticmethod
-    def _name(s, n: int = 80, what: str = "name") -> str:
-        s = " ".join(str(s or "").split())[:n]
-        if not s:
-            raise ClassroomError(f"{what} must not be empty")
-        return s
+    def _section(self, sec_id: str) -> dict:
+        s = self.db.one("SELECT * FROM sections WHERE id = ?", (sec_id,))
+        if s is None:
+            raise KeyError("no such section")
+        ids = [r["student_id"] for r in self.db.all(
+            "SELECT student_id FROM section_students WHERE section_id = ? ORDER BY position", (sec_id,))]
+        return {**s, "archived": bool(s["archived"]), "student_ids": ids}
+
+    def _assignment(self, aid: str) -> dict:
+        a = self.db.one("SELECT * FROM assignments WHERE id = ?", (aid,))
+        if a is None:
+            raise KeyError("no such assignment")
+        ids = [r["section_id"] for r in self.db.all(
+            "SELECT section_id FROM assignment_sections WHERE assignment_id = ? ORDER BY position", (aid,))]
+        return {**a, "section_ids": ids}
+
+    def _submission(self, sub_id: str) -> dict:
+        s = self.db.one("SELECT * FROM submissions WHERE id = ?", (sub_id,))
+        if s is None:
+            raise KeyError("no such submission")
+        ids = [r["feedback_id"] for r in self.db.all(
+            "SELECT feedback_id FROM submission_feedback WHERE submission_id = ? ORDER BY position", (sub_id,))]
+        return self._sub_out(s, ids)
 
     # -- students ------------------------------------------------------------------------------
     def add_students(self, names: list[str]) -> list[dict]:
         out = []
-        with self.lock:
-            have = {s["name"].lower() for s in self.data["students"]}
+        with self.db.tx() as c:
             for n in names:
-                n = self._name(n, 60, "student name")
-                if n.lower() in have:
+                n = _name(n, 60, "student name")
+                if c.execute("SELECT 1 FROM students WHERE name_key = ?", (n.lower(),)).fetchone():
                     continue
                 st = {"id": _id(), "name": n, "created": time.time()}
-                self.data["students"].append(st)
-                have.add(n.lower())
+                c.execute("INSERT INTO students(id, name, name_key, created) VALUES (?,?,?,?)",
+                          (st["id"], n, n.lower(), st["created"]))
                 out.append(st)
-            self._save()
         return out
 
     def remove_student(self, sid: str) -> None:
-        with self.lock:
-            self._find(self.data["students"], sid, "student")
-            self.data["students"] = [s for s in self.data["students"] if s["id"] != sid]
-            for sec in self.data["sections"]:
-                sec["student_ids"] = [x for x in sec["student_ids"] if x != sid]
-            self._save()
+        with self.db.tx() as c:
+            if c.execute("DELETE FROM students WHERE id = ?", (sid,)).rowcount == 0:
+                raise KeyError("no such student")
 
     # -- sections (case study feature 1) -------------------------------------------------------
+    @staticmethod
+    def _set_members(c, sec_id: str, student_ids: list[str]) -> None:
+        known = {r[0] for r in c.execute("SELECT id FROM students")}
+        c.execute("DELETE FROM section_students WHERE section_id = ?", (sec_id,))
+        c.executemany("INSERT INTO section_students(section_id, student_id, position) VALUES (?,?,?)",
+                      [(sec_id, x, i) for i, x in enumerate(x for x in dict.fromkeys(student_ids) if x in known)])
+
     def add_section(self, name: str, student_ids: list[str] | None = None, color: str | None = None,
                     kind: str = "period") -> dict:
-        with self.lock:
-            known = {s["id"] for s in self.data["students"]}
-            sec = {"id": _id(), "name": self._name(name, 60, "section name"),
-                   "kind": kind if kind in ("period", "block", "club", "tutoring", "group") else "group",
-                   "color": color if color in PALETTE else PALETTE[len(self.data["sections"]) % len(PALETTE)],
-                   "student_ids": [x for x in dict.fromkeys(student_ids or []) if x in known],
-                   "archived": False, "created": time.time()}
-            self.data["sections"].append(sec)
-            self._save()
-            return sec
+        sec_id = _id()
+        with self.db.tx() as c:
+            n = c.execute("SELECT COUNT(*) FROM sections").fetchone()[0]
+            c.execute("INSERT INTO sections(id, name, kind, color, archived, created) VALUES (?,?,?,?,0,?)",
+                      (sec_id, _name(name, 60, "section name"), kind if kind in KINDS else "group",
+                       color if color in PALETTE else PALETTE[n % len(PALETTE)], time.time()))
+            self._set_members(c, sec_id, student_ids or [])
+        return self._section(sec_id)
 
     def update_section(self, sec_id: str, **changes) -> dict:
-        with self.lock:
-            sec = self._find(self.data["sections"], sec_id, "section")
-            if "name" in changes and changes["name"] is not None:
-                sec["name"] = self._name(changes["name"], 60, "section name")
+        with self.db.tx() as c:
+            if not c.execute("SELECT 1 FROM sections WHERE id = ?", (sec_id,)).fetchone():
+                raise KeyError("no such section")
+            if changes.get("name") is not None:
+                c.execute("UPDATE sections SET name = ? WHERE id = ?", (_name(changes["name"], 60, "section name"), sec_id))
             if changes.get("student_ids") is not None:
-                known = {s["id"] for s in self.data["students"]}
-                sec["student_ids"] = [x for x in dict.fromkeys(changes["student_ids"]) if x in known]
+                self._set_members(c, sec_id, list(changes["student_ids"]))
             if changes.get("color") in PALETTE:
-                sec["color"] = changes["color"]
-            if changes.get("archived") is not None:
-                sec["archived"] = bool(changes["archived"])     # "delete" archives; "see archived" restores
-                sec["archived_at"] = time.time() if sec["archived"] else None
-            self._save()
-            return sec
+                c.execute("UPDATE sections SET color = ? WHERE id = ?", (changes["color"], sec_id))
+            if changes.get("kind") in KINDS:
+                c.execute("UPDATE sections SET kind = ? WHERE id = ?", (changes["kind"], sec_id))
+            if changes.get("archived") is not None:      # "delete" archives; "see archived" restores
+                arch = bool(changes["archived"])
+                c.execute("UPDATE sections SET archived = ?, archived_at = ? WHERE id = ?",
+                          (int(arch), time.time() if arch else None, sec_id))
+        return self._section(sec_id)
 
     def delete_section(self, sec_id: str) -> None:
-        """Permanent removal (only for archived sections); assignments keep their other sections."""
-        with self.lock:
-            sec = self._find(self.data["sections"], sec_id, "section")
-            if not sec["archived"]:
+        """Permanent removal (only for archived sections); posts keep their other sections."""
+        with self.db.tx() as c:
+            row = c.execute("SELECT archived FROM sections WHERE id = ?", (sec_id,)).fetchone()
+            if row is None:
+                raise KeyError("no such section")
+            if not row[0]:
                 raise ClassroomError("archive the section first")
-            self.data["sections"] = [s for s in self.data["sections"] if s["id"] != sec_id]
-            for a in self.data["assignments"]:
-                a["section_ids"] = [x for x in a["section_ids"] if x != sec_id]
-            self._save()
+            c.execute("DELETE FROM sections WHERE id = ?", (sec_id,))
 
     # -- assignments: post a lesson once to several sections ------------------------------------
     def assign(self, lesson_id: str, section_ids: list[str], title: str = "", due: str | None = None,
                note: str = "") -> dict:
-        with self.lock:
-            live = {s["id"] for s in self.data["sections"] if not s["archived"]}
+        aid = _id()
+        with self.db.tx() as c:
+            live = {r[0] for r in c.execute("SELECT id FROM sections WHERE archived = 0")}
             secs = [x for x in dict.fromkeys(section_ids) if x in live]
             if not secs:
                 raise ClassroomError("choose at least one active section")
-            a = {"id": _id(), "lesson_id": lesson_id, "section_ids": secs, "title": " ".join(str(title).split())[:140],
-                 "due": (due or None) and str(due)[:32], "note": " ".join(str(note).split())[:500],
-                 "posted": time.time()}
-            self.data["assignments"].append(a)
-            self.data["lesson_meta"].setdefault(lesson_id, {})["status"] = "published"
-            self._save()
-            return a
+            c.execute("INSERT INTO assignments(id, lesson_id, title, due, note, posted) VALUES (?,?,?,?,?,?)",
+                      (aid, lesson_id, " ".join(str(title).split())[:140], (due or None) and str(due)[:32],
+                       " ".join(str(note).split())[:500], time.time()))
+            c.executemany("INSERT INTO assignment_sections(assignment_id, section_id, position) VALUES (?,?,?)",
+                          [(aid, s, i) for i, s in enumerate(secs)])
+            self._status(c, lesson_id, "published")
+        return self._assignment(aid)
 
     def unassign(self, assignment_id: str) -> None:
-        with self.lock:
-            a = self._find(self.data["assignments"], assignment_id, "assignment")
-            self.data["assignments"] = [x for x in self.data["assignments"] if x["id"] != assignment_id]
-            self.data["submissions"] = [s for s in self.data["submissions"] if s["assignment_id"] != assignment_id]
-            if not any(x["lesson_id"] == a["lesson_id"] for x in self.data["assignments"]):
-                self.data["lesson_meta"].setdefault(a["lesson_id"], {})["status"] = "review"
-            self._save()
+        with self.db.tx() as c:
+            row = c.execute("SELECT lesson_id FROM assignments WHERE id = ?", (assignment_id,)).fetchone()
+            if row is None:
+                raise KeyError("no such assignment")
+            c.execute("DELETE FROM assignments WHERE id = ?", (assignment_id,))     # cascades to submissions
+            if not c.execute("SELECT 1 FROM assignments WHERE lesson_id = ?", (row[0],)).fetchone():
+                self._status(c, row[0], "review")
+
+    @staticmethod
+    def _status(c, lesson_id: str, status: str) -> None:
+        c.execute("INSERT INTO lesson_status(lesson_id, status) VALUES (?, ?) "
+                  "ON CONFLICT(lesson_id) DO UPDATE SET status = excluded.status", (lesson_id, status))
 
     def set_lesson_status(self, lesson_id: str, status: str) -> dict:
-        if status not in ("review", "published", "archived"):
+        if status not in LESSON_STATUSES:
             raise ClassroomError("status must be review, published or archived")
-        with self.lock:
-            meta = self.data["lesson_meta"].setdefault(lesson_id, {})
-            meta["status"] = status
-            self._save()
-            return meta
+        with self.db.tx() as c:
+            self._status(c, lesson_id, status)
+        return {"status": status}
 
     # -- feedback bank (case study feature 2) ---------------------------------------------------
     def add_feedback(self, text: str, points: float = 0, tag: str = "") -> dict:
-        with self.lock:
-            fb = {"id": _id(), "text": self._name(text, 240, "feedback"), "points": self._points(points),
-                  "tag": " ".join(str(tag).split())[:30], "uses": 0, "created": time.time()}
-            self.data["feedback"].append(fb)
-            self._save()
-            return fb
+        fb = {"id": _id(), "text": _name(text, 240, "feedback"), "points": _points(points),
+              "tag": " ".join(str(tag).split())[:30], "uses": 0, "created": time.time()}
+        with self.db.tx() as c:
+            c.execute("INSERT INTO feedback(id, text, points, tag, uses, created) VALUES (:id,:text,:points,:tag,:uses,:created)", fb)
+        return fb
 
     def update_feedback(self, fb_id: str, **changes) -> dict:
-        with self.lock:
-            fb = self._find(self.data["feedback"], fb_id, "feedback")
+        with self.db.tx() as c:
+            if not c.execute("SELECT 1 FROM feedback WHERE id = ?", (fb_id,)).fetchone():
+                raise KeyError("no such feedback")
             if changes.get("text") is not None:
-                fb["text"] = self._name(changes["text"], 240, "feedback")
+                c.execute("UPDATE feedback SET text = ? WHERE id = ?", (_name(changes["text"], 240, "feedback"), fb_id))
             if changes.get("points") is not None:
-                fb["points"] = self._points(changes["points"])
+                c.execute("UPDATE feedback SET points = ? WHERE id = ?", (_points(changes["points"]), fb_id))
             if changes.get("tag") is not None:
-                fb["tag"] = " ".join(str(changes["tag"]).split())[:30]
-            self._save()
-            return fb
+                c.execute("UPDATE feedback SET tag = ? WHERE id = ?", (" ".join(str(changes["tag"]).split())[:30], fb_id))
+        return self.db.one("SELECT * FROM feedback WHERE id = ?", (fb_id,))
 
     def delete_feedback(self, fb_id: str) -> None:
-        with self.lock:
-            self._find(self.data["feedback"], fb_id, "feedback")
-            self.data["feedback"] = [f for f in self.data["feedback"] if f["id"] != fb_id]
-            for s in self.data["submissions"]:
-                s["feedback_ids"] = [x for x in s.get("feedback_ids", []) if x != fb_id]
-                self._grade(s)
-            self._save()
-
-    @staticmethod
-    def _points(v) -> float:
-        try:
-            p = float(v)
-        except (TypeError, ValueError):
-            raise ClassroomError("points must be a number") from None
-        if not -100 <= p <= 100:
-            raise ClassroomError("points must be between -100 and 100")
-        return round(p, 2)
+        with self.db.tx() as c:
+            subs = [r[0] for r in c.execute("SELECT submission_id FROM submission_feedback WHERE feedback_id = ?", (fb_id,))]
+            if c.execute("DELETE FROM feedback WHERE id = ?", (fb_id,)).rowcount == 0:
+                raise KeyError("no such feedback")
+            for s in subs:                          # grades that used it are recomputed without it
+                self._regrade(c, s)
 
     # -- submissions + auto-grading ---------------------------------------------------------------
     def submit(self, assignment_id: str, student_id: str, answers: list, quiz: dict | None) -> dict:
-        with self.lock:
-            a = self._find(self.data["assignments"], assignment_id, "assignment")
-            st = self._find(self.data["students"], student_id, "student")
-            in_sections = {sid for sec in self.data["sections"] if sec["id"] in a["section_ids"]
-                           for sid in sec["student_ids"]}
-            if st["id"] not in in_sections:
+        with self.db.tx() as c:
+            if not c.execute("SELECT 1 FROM assignments WHERE id = ?", (assignment_id,)).fetchone():
+                raise KeyError("no such assignment")
+            if not c.execute("SELECT 1 FROM students WHERE id = ?", (student_id,)).fetchone():
+                raise KeyError("no such student")
+            member = c.execute("SELECT 1 FROM assignment_sections a JOIN section_students s ON s.section_id = a.section_id "
+                               "WHERE a.assignment_id = ? AND s.student_id = ?", (assignment_id, student_id)).fetchone()
+            if not member:
                 raise ClassroomError("this student is not in a section the lesson was posted to")
             questions = (quiz or {}).get("questions") or []
             if not questions:
@@ -229,38 +262,91 @@ class Classroom:
                    for x in list(answers)[: len(questions)]]
             ans += [None] * (len(questions) - len(ans))
             correct = [q.get("answer_index") for q in questions]
-            prev = next((s for s in self.data["submissions"]
-                         if s["assignment_id"] == assignment_id and s["student_id"] == student_id), None)
-            sub = prev or {"id": _id(), "assignment_id": assignment_id, "student_id": student_id,
-                           "feedback_ids": [], "comment": ""}
-            sub.update(answers=ans, correct=correct, submitted=time.time(),
-                       auto=sum(POINTS_PER_QUESTION for a_, c in zip(ans, correct) if a_ is not None and a_ == c),
-                       max=POINTS_PER_QUESTION * len(questions))
-            self._grade(sub)
-            if prev is None:
-                self.data["submissions"].append(sub)
-            self._save()
-            return sub
+            auto = sum(POINTS_PER_QUESTION for a_, k in zip(ans, correct) if a_ is not None and a_ == k)
+            prev = c.execute("SELECT id FROM submissions WHERE assignment_id = ? AND student_id = ?",
+                             (assignment_id, student_id)).fetchone()
+            sub_id = prev[0] if prev else _id()
+            if prev:          # a resubmission replaces the answers; applied feedback and comment stay
+                c.execute("UPDATE submissions SET answers=?, correct=?, auto=?, max=?, submitted=? WHERE id=?",
+                          (json.dumps(ans), json.dumps(correct), auto, POINTS_PER_QUESTION * len(questions),
+                           time.time(), sub_id))
+            else:
+                c.execute("INSERT INTO submissions(id, assignment_id, student_id, answers, correct, auto, max, adjust, "
+                          "grade, comment, submitted) VALUES (?,?,?,?,?,?,?,0,0,'',?)",
+                          (sub_id, assignment_id, student_id, json.dumps(ans), json.dumps(correct), auto,
+                           POINTS_PER_QUESTION * len(questions), time.time()))
+            self._regrade(c, sub_id)
+        return self._submission(sub_id)
 
     def grade(self, submission_id: str, feedback_ids: list[str] | None = None, comment: str | None = None) -> dict:
         """Apply saved feedback (each may carry points) and an optional personal comment."""
-        with self.lock:
-            sub = self._find(self.data["submissions"], submission_id, "submission")
+        with self.db.tx() as c:
+            if not c.execute("SELECT 1 FROM submissions WHERE id = ?", (submission_id,)).fetchone():
+                raise KeyError("no such submission")
             if feedback_ids is not None:
-                bank = {f["id"]: f for f in self.data["feedback"]}
+                bank = {r[0] for r in c.execute("SELECT id FROM feedback")}
                 new = [x for x in dict.fromkeys(feedback_ids) if x in bank]
-                for x in set(new) - set(sub.get("feedback_ids", [])):
-                    bank[x]["uses"] = bank[x].get("uses", 0) + 1
-                sub["feedback_ids"] = new
+                old = {r[0] for r in c.execute("SELECT feedback_id FROM submission_feedback WHERE submission_id = ?",
+                                               (submission_id,))}
+                c.executemany("UPDATE feedback SET uses = uses + 1 WHERE id = ?", [(x,) for x in set(new) - old])
+                c.execute("DELETE FROM submission_feedback WHERE submission_id = ?", (submission_id,))
+                c.executemany("INSERT INTO submission_feedback(submission_id, feedback_id, position) VALUES (?,?,?)",
+                              [(submission_id, x, i) for i, x in enumerate(new)])
             if comment is not None:
-                sub["comment"] = str(comment)[:2000]
-            sub["graded"] = time.time()
-            self._grade(sub)
-            self._save()
-            return sub
+                c.execute("UPDATE submissions SET comment = ? WHERE id = ?", (str(comment)[:2000], submission_id))
+            c.execute("UPDATE submissions SET graded = ? WHERE id = ?", (time.time(), submission_id))
+            self._regrade(c, submission_id)
+        return self._submission(submission_id)
 
-    def _grade(self, sub: dict) -> None:
-        bank = {f["id"]: f for f in self.data["feedback"]}
-        adj = sum(bank[x]["points"] for x in sub.get("feedback_ids", []) if x in bank)
-        sub["adjust"] = round(adj, 2)
-        sub["grade"] = round(max(0.0, min(float(sub.get("max", 0)), sub.get("auto", 0) + adj)), 2)
+    @staticmethod
+    def _regrade(c, sub_id: str) -> None:
+        """grade = auto-marked points + points of the applied feedback, kept within [0, max]."""
+        adj = c.execute("SELECT COALESCE(SUM(f.points), 0) FROM submission_feedback sf JOIN feedback f ON f.id = sf.feedback_id "
+                        "WHERE sf.submission_id = ?", (sub_id,)).fetchone()[0]
+        c.execute("UPDATE submissions SET adjust = ?, grade = ROUND(MAX(0, MIN([max], auto + ?)), 2) WHERE id = ?",
+                  (round(adj, 2), adj, sub_id))
+
+    # -- one-time import of the earlier classroom.json -------------------------------------------
+    def _import_legacy(self, path: Path) -> None:
+        if not path.is_file():
+            return
+        try:
+            d = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return
+        with self.db.tx() as c:
+            lessons = {r[0] for r in c.execute("SELECT id FROM jobs")}
+            for s in d.get("students") or []:
+                c.execute("INSERT OR IGNORE INTO students(id, name, name_key, created) VALUES (?,?,?,?)",
+                          (s["id"], s["name"], s["name"].lower(), s.get("created") or time.time()))
+            for s in d.get("sections") or []:
+                c.execute("INSERT OR IGNORE INTO sections(id, name, kind, color, archived, archived_at, created) "
+                          "VALUES (?,?,?,?,?,?,?)", (s["id"], s["name"], s.get("kind") or "group", s.get("color") or PALETTE[0],
+                                                     int(bool(s.get("archived"))), s.get("archived_at"), s.get("created") or time.time()))
+                self._set_members(c, s["id"], s.get("student_ids") or [])
+            for a in d.get("assignments") or []:
+                if a.get("lesson_id") not in lessons:
+                    continue
+                c.execute("INSERT OR IGNORE INTO assignments(id, lesson_id, title, due, note, posted) VALUES (?,?,?,?,?,?)",
+                          (a["id"], a["lesson_id"], a.get("title") or "", a.get("due"), a.get("note") or "", a.get("posted") or time.time()))
+                c.executemany("INSERT OR IGNORE INTO assignment_sections(assignment_id, section_id, position) "
+                              "SELECT ?, id, ? FROM sections WHERE id = ?", [(a["id"], i, s) for i, s in enumerate(a.get("section_ids") or [])])
+            for f in d.get("feedback") or []:
+                c.execute("INSERT OR IGNORE INTO feedback(id, text, points, tag, uses, created) VALUES (?,?,?,?,?,?)",
+                          (f["id"], f["text"], f.get("points") or 0, f.get("tag") or "", f.get("uses") or 0, f.get("created") or time.time()))
+            subs = {r[0] for r in c.execute("SELECT id FROM assignments")}
+            studs = {r[0] for r in c.execute("SELECT id FROM students")}
+            for s in d.get("submissions") or []:
+                if s.get("assignment_id") not in subs or s.get("student_id") not in studs:
+                    continue
+                c.execute("INSERT OR IGNORE INTO submissions(id, assignment_id, student_id, answers, correct, auto, max, adjust, "
+                          "grade, comment, submitted, graded) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                          (s["id"], s["assignment_id"], s["student_id"], json.dumps(s.get("answers") or []),
+                           json.dumps(s.get("correct") or []), s.get("auto") or 0, s.get("max") or 0, s.get("adjust") or 0,
+                           s.get("grade") or 0, s.get("comment") or "", s.get("submitted") or time.time(), s.get("graded")))
+                c.executemany("INSERT OR IGNORE INTO submission_feedback(submission_id, feedback_id, position) "
+                              "SELECT ?, id, ? FROM feedback WHERE id = ?", [(s["id"], i, f) for i, f in enumerate(s.get("feedback_ids") or [])])
+            for lid, meta in (d.get("lesson_meta") or {}).items():
+                if lid in lessons and (meta or {}).get("status") in LESSON_STATUSES:
+                    self._status(c, lid, meta["status"])
+        path.rename(path.with_name(path.name + ".imported"))

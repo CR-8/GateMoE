@@ -16,10 +16,9 @@ import { initials } from "@/lib/format";
 import type { Section } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const KIND_LABEL: Record<string, string> = { period: "Class period", block: "Block", club: "Club", tutoring: "Tutoring", group: "Group" };
 
 function SectionCard({ s, onDelete }: { s: Section; onDelete: (s: Section) => void }) {
-  const { classroom, refreshClassroom } = useStore();
+  const { classroom, config, refreshClassroom } = useStore();
   const dialogs = useDialogs();
   const posts = classroom.assignments.filter((a) => a.section_ids.includes(s.id));
   const subs = classroom.submissions.filter((x) => posts.some((a) => a.id === x.assignment_id) && s.student_ids.includes(x.student_id));
@@ -40,7 +39,7 @@ function SectionCard({ s, onDelete }: { s: Section; onDelete: (s: Section) => vo
             style={{ background: s.color }}>{initials(s.name)}</span>
           <div className="min-w-0 flex-1">
             <div className="truncate font-display text-subheading text-charcoal-ink">{s.name}</div>
-            <div className="mt-0.5 flex items-center gap-1.5"><Badge variant="gray">{KIND_LABEL[s.kind] || s.kind}</Badge>{s.archived && <Badge variant="outline">Archived</Badge>}</div>
+            <div className="mt-0.5 flex items-center gap-1.5"><Badge variant="gray">{config?.classroom.kinds[s.kind] || s.kind}</Badge>{s.archived && <Badge variant="outline">Archived</Badge>}</div>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild><Button variant="ghost" size="icon-sm" aria-label="Section actions"><MoreHorizontalIcon /></Button></DropdownMenuTrigger>

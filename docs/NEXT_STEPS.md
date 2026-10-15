@@ -53,6 +53,10 @@ research). Status: built and tested against the fake server; waiting for the clo
   `/api/submissions`, `/api/assignments/<id>/take`, `/api/knowledge`; `GET /api/lessons` now returns summaries.
 * Video: both engines share the light design system, a footer (lesson title, scene n/N, progress) and
   HyperFrames twins of the Manim-only scenes (graph, math, binary-search steps).
+* Storage: one SQLite database per node (`gatemoe/db.py`, `paths.db`) for jobs, lessons and the classroom;
+  older `job.json` / `classroom.json` files are imported automatically on first start. No sample data ships.
+  `gatemoe serve --no-generate` is a browse-and-grade console that never loads a model; `gatemoe import <dir>`
+  puts finished lesson folders (e.g. the paper-1 campaign's) on the board in place.
 * Merge into `main` after the paper-1 campaign has finished: do not re-run setup on the campaign VM before.
 * Not yet: accounts/roles (a node is a trusted LAN appliance), editing generated content in the UI,
   exporting grades as CSV.

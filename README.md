@@ -55,8 +55,9 @@ starts the web app as a service. Details, instance sizes and access options: [do
 
 | Command | What it does |
 |---|---|
-| `gatemoe serve` | web app + job queue: teacher console (lesson board, sections, grading with a feedback bank) and a student quiz link, with live routing/metrics |
+| `gatemoe serve [--no-generate]` | web app + job queue (`--no-generate`: browse, post and grade without ever loading a model): teacher console (lesson board, sections, grading with a feedback bank) and a student quiz link, with live routing/metrics |
 | `gatemoe lesson "<request>" [--language kn] [--mode clef\|all\|manual --gateways notes,quiz]` | one lesson from the terminal |
+| `gatemoe import <folder>...` | add finished lesson folders (anything with a `lesson.json`) to the lesson board, in place |
 | `gatemoe route "<request>" ...` | router decision only |
 | `gatemoe doctor` | checks models, voices, video engines, ZIMs, fonts, RAM |
 | `gatemoe catalog` | lists offline knowledge archives |
@@ -95,7 +96,7 @@ pip install -e ".[dev]"
 pytest                      # model-free tests (a fake llama-server stands in for the models)
 
 # web UI (React + Tailwind in web/, built into gatemoe/server/static - the build is committed)
-python scripts/demo_ui.py --port 8000 &    # sample data, no models
+gatemoe serve --no-generate --port 8000 &  # the API on your local database, without loading models
 cd web && npm install && npm run dev       # http://localhost:5173 ; npm run build when done
 ```
 

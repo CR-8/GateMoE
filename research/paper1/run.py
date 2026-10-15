@@ -1054,6 +1054,7 @@ class ServingPhase(Phase):
             tree = json.loads(json.dumps(cfg.tree))
             tree["paths"]["jobs_dir"] = str(work / "jobs")
             tree["paths"]["cache_dir"] = str(work / "cache")
+            tree["paths"]["db"] = str(work / "gatemoe.db")      # never the node's own database
             tree["router"]["memo_cache"] = False
             tree["server"]["max_pending_jobs"] = 50
             with socket.socket() as sk:

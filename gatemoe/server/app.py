@@ -9,6 +9,7 @@ import json
 import mimetypes
 import queue
 import socket
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -20,9 +21,9 @@ from fastapi.responses import (FileResponse, HTMLResponse, PlainTextResponse, Re
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from ..classroom import Classroom, ClassroomError
+from ..classroom import KINDS, PALETTE, POINTS_PER_QUESTION, Classroom, ClassroomError
 from ..config import Config, load_config
-from ..jobs import JobManager, QueueFull
+from ..jobs import GenerationOff, JobManager, QueueFull
 from ..knowledge import KnowledgeBase
 from ..router.clef import GATEWAYS
 from ..runtime import sysinfo
@@ -81,34 +82,6 @@ class GradeIn(BaseModel):
 
 class LessonMetaIn(BaseModel):
     status: str
-
-
-def lesson_summary(job: dict, lesson: dict | None, job_dir: Path) -> dict:
-    """What the lesson board shows for one job (lesson.json can be large; this is small)."""
-    out = {**job}
-    if not lesson:
-        return out
-    route = lesson.get("route") or {}
-    plan, notes = lesson.get("plan") or {}, lesson.get("notes") or {}
-    out.update({
-        "title": notes.get("title") or plan.get("title") or job.get("request", "")[:80],
-        "summary": (notes.get("key_points") or [""])[0] if notes.get("key_points") else "",
-        "language": lesson.get("language"), "selected": route.get("selected") or [],
-        "route_mode": route.get("mode"), "subject": route.get("subject"), "level": route.get("level"),
-        "has": {k: bool(lesson.get(k)) for k in ("notes", "flashcards", "quiz", "podcast", "video", "code",
-                                                  "podcast_audio", "video_render", "handout", "concept_map",
-                                                  "simulations")},
-        "counts": {"cards": len((lesson.get("flashcards") or {}).get("cards") or []),
-                   "questions": len((lesson.get("quiz") or {}).get("questions") or []),
-                   "sources": len(lesson.get("sources") or []),
-                   "sims": len(lesson.get("simulations") or [])},
-        "wall_s": (lesson.get("metrics") or {}).get("wall_seconds"),
-        "errors": sorted((lesson.get("errors") or {}).keys()),
-        "out_of_scope": bool(lesson.get("out_of_scope")),
-        "thumb": ((lesson.get("concept_map") or {}).get("png")
-                  if (job_dir / str((lesson.get("concept_map") or {}).get("png") or "_")).exists() else None),
-    })
-    return out
 
 
 class LessonIn(BaseModel):
@@ -190,7 +163,8 @@ def create_app(cfg: Config | None = None, jobs: JobManager | None = None) -> Fas
             return PlainTextResponse("host not allowed (add it to server.allowed_hosts)", status_code=403)
         return await call_next(request)
     kb = KnowledgeBase(cfg)
-    classroom = Classroom(cfg.path("paths.jobs_dir").parent / "classroom.json")
+    # one database for jobs, lessons and the classroom; an earlier classroom.json is imported once
+    classroom = Classroom(jobs.db, legacy_json=cfg.path("paths.jobs_dir").parent / "classroom.json")
     app.state.classroom = classroom
 
     @app.get("/healthz")
@@ -213,15 +187,32 @@ def create_app(cfg: Config | None = None, jobs: JobManager | None = None) -> Fas
             "router_mode": cfg["router.mode"],
             "threshold": cfg["router.threshold"],
             "models": {r: cfg[f"models.{r}.file"] for r in ("router", "generator")},
+            "generate": jobs.generate,
+            "classroom": {"palette": PALETTE, "kinds": KINDS, "points_per_question": POINTS_PER_QUESTION},
         }
+
+    probe: dict = {"t": 0.0, "items": []}
+
+    def installed() -> list[dict]:
+        """What this node has installed (models, voices, video engines, archives). Checking touches
+        the disk and may start a Python to test Manim, so it is cached for a minute."""
+        from ..registry import specialists
+        if time.monotonic() - probe["t"] > 60 or not probe["items"]:
+            try:
+                pipe = jobs.pipeline              # builds the gateways only: no model is loaded
+            except Exception:
+                pipe = None
+            probe["items"] = specialists(cfg, pipe) if pipe is not None else specialists(cfg)
+            probe["t"] = time.monotonic()
+        return probe["items"]
 
     @app.get("/api/system")
     def system() -> dict:
         pipe = jobs._pipeline
-        from ..registry import specialists
         return {"sys": sysinfo.snapshot(),
                 "models": pipe.models.status() if pipe else {"loaded": None},
-                "specialists": specialists(cfg, pipe) if pipe else specialists(cfg),
+                "specialists": installed(),
+                "generate": jobs.generate,
                 "queue": sum(1 for j in jobs.list() if j.status in ("queued", "running"))}
 
     @app.post("/api/lessons")
@@ -235,33 +226,25 @@ def create_app(cfg: Config | None = None, jobs: JobManager | None = None) -> Fas
         try:
             job = jobs.submit(body.request, {"language": body.language, "mode": body.mode,
                                              "gateways": sorted(set(body.gateways)) if body.gateways else None})
+        except GenerationOff as exc:
+            raise HTTPException(503, str(exc))
         except QueueFull as exc:
             raise HTTPException(429, str(exc))
         except ValueError as exc:            # e.g. a whitespace-only request
             raise HTTPException(400, str(exc))
         return job.public()
 
-    summaries: dict[str, tuple[float, dict]] = {}
-
     @app.get("/api/lessons")
     def list_lessons() -> list[dict]:
         out = []
         meta = classroom.snapshot()["lesson_meta"]
-        for j in jobs.list()[:200]:
+        summaries = jobs.summaries()
+        for j in jobs.list()[:500]:
             pub = j.public()
-            d = jobs.job_dir(j.id)
-            p = d / "lesson.json"
-            try:
-                mt = p.stat().st_mtime
-            except OSError:
-                mt = None
-            if mt is not None and (j.id not in summaries or summaries[j.id][0] != mt):
-                summaries[j.id] = (mt, lesson_summary({}, jobs.lesson(j.id), d))
-            summ = summaries[j.id][1] if mt is not None and j.id in summaries else {}
             if j.status == "running":                     # live stage for the board's "Generating" column
                 log = jobs.events(j.id)
                 pub["stage"] = log.current_stage if log else None
-            out.append({**summ, **pub, "board": (meta.get(j.id) or {}).get("status")})
+            out.append({**summaries.get(j.id, {}), **pub, "board": (meta.get(j.id) or {}).get("status")})
         return out
 
     def _job(job_id: str):

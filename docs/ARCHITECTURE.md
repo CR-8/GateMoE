@@ -70,10 +70,11 @@ records `specialists.available` vs `specialists.activated` and all timings.
 | `gatemoe/gateways/handout.py` | Typst PDF handout (notes, glossary, cut-out flashcards, quiz + answer key) |
 | `gatemoe/pipeline.py` | the lesson pipeline (stages above) |
 | `gatemoe/jobs.py`, `gatemoe/server/` | job queue, REST + SSE API; serves the built web UI from `server/static` |
-| `gatemoe/classroom.py` | roster, sections (archive/restore), posting a lesson to several sections, feedback bank with grade points, auto-marked quiz submissions (one JSON file) |
+| `gatemoe/db.py` | the node database: one SQLite file (`paths.db`) with jobs, lessons (document + board summary), roster, sections, posts, feedback bank, submissions; imports older `job.json` / `classroom.json` files once |
+| `gatemoe/classroom.py` | roster, sections (archive/restore), posting a lesson to several sections, feedback bank with grade points, auto-marked quiz submissions (on the database) |
 | `web/` | teacher console + student quiz view (React 19, Tailwind v4, Radix); see [DESIGN.md](DESIGN.md) |
 | `gatemoe/cli.py` | `serve`, `lesson`, `route`, `catalog`, `doctor`, `swapbench` |
-| `scripts/` | Pi install, offline asset download, log analysis, `demo_ui.py` (UI on sample data) |
+| `scripts/` | Pi install, offline asset download, log analysis |
 
 ## Safety
 

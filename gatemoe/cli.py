@@ -1,4 +1,4 @@
-"""Command line: ``gatemoe serve | lesson | route | doctor | catalog | swapbench | kdd``."""
+"""Command line: ``gatemoe serve | import | lesson | route | doctor | catalog | swapbench | kdd``."""
 from __future__ import annotations
 
 import argparse
@@ -90,11 +90,44 @@ def cmd_route(args, cfg) -> int:
 def cmd_serve(args, cfg) -> int:
     import uvicorn
 
+    from .jobs import JobManager
     from .server.app import create_app
 
-    app = create_app(cfg)
+    generate = bool(cfg.get("server.generate", True)) and not args.no_generate
+    jobs = None
+    if not generate:      # a console beside a benchmark or on a second machine: never loads a model
+        from .pipeline import LessonPipeline     # built only to report what is installed
+
+        jobs = JobManager(cfg, lambda: LessonPipeline(cfg), generate=False)
+    app = create_app(cfg, jobs)
     uvicorn.run(app, host=args.host or cfg["server.host"], port=args.port or int(cfg["server.port"]),
                 log_level="info", timeout_graceful_shutdown=5)   # open SSE streams must not block shutdown
+    return 0
+
+
+def cmd_import(args, cfg) -> int:
+    """Register finished lesson folders (any folder holding a lesson.json) on the lesson board."""
+    from .jobs import JobManager
+
+    cfg.ensure_dirs()
+    jobs = JobManager(cfg, lambda: None, generate=False)
+    added = skipped = 0
+    for root in args.dirs:
+        root = Path(root)
+        found = [root] if (root / "lesson.json").is_file() else sorted(p.parent for p in root.rglob("lesson.json"))
+        for folder in found:
+            try:
+                job = jobs.register_folder(folder)
+            except (OSError, ValueError) as exc:     # e.g. a lesson.json still being written: next run
+                print(f"skipped {folder}: {exc}")
+                skipped += 1
+                continue
+            if job:
+                added += 1
+                print(f"added   {job.id}  {folder}")
+            else:
+                skipped += 1
+    print(f"{added} lesson(s) added, {skipped} skipped or already on the board; database: {cfg.path('paths.db')}")
     return 0
 
 
@@ -180,6 +213,11 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("serve", help="run the web app")
     s.add_argument("--host")
     s.add_argument("--port", type=int)
+    s.add_argument("--no-generate", action="store_true",
+                   help="browse, post and grade only: never load a model (e.g. while a benchmark runs)")
+
+    s = sub.add_parser("import", help="add finished lesson folders (with lesson.json) to the lesson board, in place")
+    s.add_argument("dirs", nargs="+", help="lesson folders, or folders to search for lesson.json")
 
     s = sub.add_parser("lesson", help="generate one lesson from the command line")
     s.add_argument("request")
@@ -211,7 +249,7 @@ def main(argv: list[str] | None = None) -> int:
 
     args = p.parse_args(argv)
     cfg = load_config(args.config)
-    return {"serve": cmd_serve, "lesson": cmd_lesson, "route": cmd_route, "catalog": cmd_catalog,
+    return {"serve": cmd_serve, "import": cmd_import, "lesson": cmd_lesson, "route": cmd_route, "catalog": cmd_catalog,
             "doctor": cmd_doctor, "swapbench": cmd_swapbench,
             "kdd": cmd_kdd}[args.cmd](args, cfg)
 

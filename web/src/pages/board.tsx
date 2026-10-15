@@ -44,7 +44,7 @@ function Stats({ lessons }: { lessons: LessonSummary[] }) {
 }
 
 function Board({ lessons }: { lessons: LessonSummary[] }) {
-  const { classroom, refreshLessons } = useStore();
+  const { classroom, config, refreshLessons } = useStore();
   const dialogs = useDialogs();
   const items = lessons.map((l) => ({ ...l, column: columnOf(l) as string }));
   return (
@@ -71,7 +71,7 @@ function Board({ lessons }: { lessons: LessonSummary[] }) {
                 <span className="size-2.5 rounded-full" style={{ background: column.color }} />
                 {column.name}
                 <span className="rounded-full bg-white px-2 text-caption text-slate tabular-nums">{cards.length}</span>
-                {column.id === "queued" && (
+                {column.id === "queued" && config?.generate !== false && (
                   <Button variant="ghost" size="icon-sm" className="ml-auto size-7" onClick={dialogs.openNewLesson} aria-label="New lesson"><PlusIcon /></Button>
                 )}
               </KanbanHeader>
@@ -139,7 +139,8 @@ function List({ lessons }: { lessons: LessonSummary[] }) {
 }
 
 export function BoardPage() {
-  const { lessons } = useStore();
+  const { lessons, config } = useStore();
+  const canGenerate = config?.generate !== false;
   const dialogs = useDialogs();
   const [view, setView] = React.useState(readView);
   const [q, setQ] = React.useState("");
@@ -157,7 +158,8 @@ export function BoardPage() {
             <ToggleGroupItem value="list"><ListIcon /> List</ToggleGroupItem>
             <ToggleGroupItem value="board"><ColumnsIcon /> Board</ToggleGroupItem>
           </ToggleGroup>
-          <Button onClick={dialogs.openNewLesson}><PlusIcon /> New lesson</Button>
+          <Button onClick={dialogs.openNewLesson} disabled={!canGenerate}
+            title={canGenerate ? undefined : "Lesson generation is switched off on this server"}><PlusIcon /> New lesson</Button>
         </>}>
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative w-full max-w-md">
@@ -171,11 +173,18 @@ export function BoardPage() {
           )}
         </div>
       </PageHeader>
+      {!canGenerate && (
+        <div className="rounded-3xl bg-yellow-tint px-5 py-4 text-body-sm text-graphite">
+          Browse-and-grade mode: this server does not generate lessons (it was started with <code className="font-mono text-[13px]">--no-generate</code>,
+          e.g. while a benchmark uses the models). Lessons added with <code className="font-mono text-[13px]">gatemoe import</code> appear here.
+        </div>
+      )}
       {!archived && <Stats lessons={lessons} />}
       {lessons.length === 0 ? (
         <Empty icon={SparklesIcon} title="No lessons yet"
-          action={<Button variant="outline" onClick={dialogs.openNewLesson}><PlusIcon /> Create the first lesson</Button>}>
-          Ask for a topic in any supported language. The router picks notes, flashcards, a quiz, a podcast, a video or code, and only those are generated.
+          action={canGenerate && <Button variant="outline" onClick={dialogs.openNewLesson}><PlusIcon /> Create the first lesson</Button>}>
+          {canGenerate ? "Ask for a topic in any supported language. The router picks notes, flashcards, a quiz, a podcast, a video or code, and only those are generated."
+            : "Generation is off on this server. Add finished lesson folders with: gatemoe import <folder>"}
         </Empty>
       ) : archived || view === "list" ? (
         shown.length ? <List lessons={shown} /> : <Empty title={archived ? "No archived lessons" : "No lessons match"} />

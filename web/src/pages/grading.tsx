@@ -215,7 +215,7 @@ function GradeSheet({ rows, index, setIndex, questions }:
 }
 
 export function GradingPage({ assignmentId, sectionId }: { assignmentId?: string; sectionId?: string }) {
-  const { classroom, lessons } = useStore();
+  const { classroom, lessons, config } = useStore();
   const [secFilter, setSecFilter] = React.useState<string>(sectionId || "all");
   const [open, setOpen] = React.useState<number | null>(null);
   const [questions, setQuestions] = React.useState<QuizQuestion[]>([]);
@@ -296,7 +296,7 @@ export function GradingPage({ assignmentId, sectionId }: { assignmentId?: string
 
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard tint="blue" label="Submitted" value={`${submitted.length} / ${rows.length}`} hint={current.due ? `due ${current.due}` : `posted ${ago(current.posted)}`} />
-        <StatCard tint="green" label="Average grade" value={avg == null ? "–" : `${avg}%`} hint={`${questions.length || "–"} questions · 2 points each`} />
+        <StatCard tint="green" label="Average grade" value={avg == null ? "–" : `${avg}%`} hint={`${questions.length || "–"} questions · ${config?.classroom.points_per_question ?? "–"} points each`} />
         <StatCard tint="yellow" label="Reviewed" value={`${graded.length} / ${submitted.length}`} hint={submitted.length - graded.length ? `${submitted.length - graded.length} waiting for your review` : "all caught up"} />
       </div>
 

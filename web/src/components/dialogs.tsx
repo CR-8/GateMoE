@@ -20,8 +20,6 @@ import { lessonTitle } from "@/lib/board";
 import { GATEWAYS, type Gateway, type Section } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-export const PALETTE = ["#1a73e8", "#188038", "#e37400", "#9334e6", "#d93025", "#007b83", "#b06000", "#5f6368"];
-const KINDS = [["period", "Class period"], ["block", "Block"], ["club", "Club"], ["tutoring", "Tutoring group"], ["group", "Other group"]];
 
 type Dialogs = { openNewLesson: () => void; openAssign: (lessonId: string) => void; openSection: (s?: Section) => void };
 const Ctx = React.createContext<Dialogs>({ openNewLesson() {}, openAssign() {}, openSection() {} });
@@ -44,15 +42,10 @@ export function DialogsProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-const EXAMPLES = [
-  "Explain Ohm's law for class 10 with a quiz",
-  "प्रकाश संश्लेषण को सरल भाषा में समझाइए",
-  "Binary search in Python with a short video",
-  "Make flashcards on the parts of a cell",
-];
-
 function NewLessonDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
-  const { config, refreshLessons } = useStore();
+  const { config, lessons, refreshLessons } = useStore();
+  // shortcuts: this node's own recent requests (nothing hard-coded)
+  const recent = [...new Set(lessons.filter((l) => l.status === "done").map((l) => l.request.trim()))].slice(0, 4);
   const [request, setRequest] = React.useState("");
   const [language, setLanguage] = React.useState("auto");
   const [mode, setMode] = React.useState("clef");
@@ -86,12 +79,15 @@ function NewLessonDialog({ open, onOpenChange }: { open: boolean; onOpenChange: 
               <Textarea id="req" autoFocus value={request} onChange={(e) => setRequest(e.target.value)} maxLength={2000}
                 placeholder="e.g. Explain refraction of light for class 8, with flashcards and a podcast"
                 onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void submit(e); }} />
-              <div className="flex flex-wrap gap-1.5">
-                {EXAMPLES.map((x) => (
-                  <button type="button" key={x} onClick={() => setRequest(x)}
-                    className="rounded-full border border-mist px-3 py-1 text-caption text-graphite hover:border-google-blue hover:text-google-blue">{x}</button>
-                ))}
-              </div>
+              {recent.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-caption text-slate">Recent:</span>
+                  {recent.map((x) => (
+                    <button type="button" key={x} onClick={() => setRequest(x)}
+                      className="max-w-full truncate rounded-full border border-mist px-3 py-1 text-caption text-graphite hover:border-google-blue hover:text-google-blue">{x}</button>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="grid gap-5 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
@@ -240,11 +236,13 @@ function AssignDialog({ lessonId, onClose }: { lessonId: string | null; onClose:
 }
 
 function SectionDialog({ section, onClose }: { section: Section | null | undefined; onClose: () => void }) {
-  const { classroom, refreshClassroom } = useStore();
+  const { classroom, config, refreshClassroom } = useStore();
+  const PALETTE = config?.classroom.palette ?? [];
+  const KINDS = Object.entries(config?.classroom.kinds ?? {});
   const open = section !== undefined;
   const [name, setName] = React.useState("");
   const [kind, setKind] = React.useState("period");
-  const [color, setColor] = React.useState(PALETTE[0]);
+  const [color, setColor] = React.useState("");
   const [ids, setIds] = React.useState<string[]>([]);
   const [q, setQ] = React.useState("");
   const [newNames, setNewNames] = React.useState("");
@@ -252,7 +250,7 @@ function SectionDialog({ section, onClose }: { section: Section | null | undefin
   React.useEffect(() => {
     if (!open) return;
     setName(section?.name || ""); setKind(section?.kind || "period");
-    setColor(section?.color || PALETTE[classroom.sections.length % PALETTE.length]);
+    setColor(section?.color || PALETTE[classroom.sections.length % Math.max(1, PALETTE.length)] || "");
     setIds(section?.student_ids || []); setQ(""); setNewNames("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, section?.id]);
@@ -271,8 +269,9 @@ function SectionDialog({ section, onClose }: { section: Section | null | undefin
   const submit = async () => {
     setBusy(true);
     try {
-      if (section) await api.updateSection(section.id, { name, kind, color, student_ids: ids });
-      else await api.addSection({ name, kind, color, student_ids: ids });
+      const c = color || undefined;
+      if (section) await api.updateSection(section.id, { name, kind, color: c, student_ids: ids });
+      else await api.addSection({ name, kind, color: c, student_ids: ids });
       await refreshClassroom();
       toast(section ? "Section updated" : `Section “${name}” created`);
       onClose();
