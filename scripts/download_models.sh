@@ -16,7 +16,7 @@ get() {  # url dest [sha256]
   if [ -s "$dst" ] && { [ -z "$sha" ] || echo "$sha  $dst" | sha256sum -c --quiet - 2>/dev/null; }; then
     echo "ok   $dst"; return; fi
   echo "get  $url"
-  curl -fL --retry 5 --retry-delay 5 -C - -o "$dst.part" "$url"
+  curl -fL --retry 5 --retry-delay 5 -C - -o "$dst.part" "$url" || return 1   # explicit: callers may test get in an if
   if [ -n "$sha" ] && ! echo "$sha  $dst.part" | sha256sum -c --quiet -; then
     echo "checksum mismatch for $dst.part - deleted, run again"; rm -f "$dst.part"; return 1; fi
   mv "$dst.part" "$dst"            # only verified files ever appear under the name the app loads
@@ -50,9 +50,14 @@ if [ "${SKIP_ZIMS:-0}" != 1 ]; then
       *) project="${prefix%%_*}" ;;                           # wikipedia, wikibooks, phet, devdocs, ...
     esac
     listing="$(curl -fsSL "https://download.kiwix.org/zim/${project}/")" || { echo "skip $prefix (listing failed)"; continue; }
-    file="$(printf '%s' "$listing" | grep -o "${prefix}_[0-9]\{4\}-[0-9]\{2\}\.zim" | sort -u | tail -1)"
-    if [ -z "$file" ]; then echo "skip $prefix (not found)"; continue; fi
-    get "https://download.kiwix.org/zim/${project}/${file}" "$DATA_DIR/zim/${file}"
+    # newest dated file first; a just-published snapshot may not be on the mirrors yet (404), so
+    # fall back to the one before it; one unavailable archive never stops the install
+    file=""
+    for cand in $(printf '%s' "$listing" | grep -o "${prefix}_[0-9]\{4\}-[0-9]\{2\}\.zim" | sort -u | tail -2 | sort -r); do
+      if get "https://download.kiwix.org/zim/${project}/${cand}" "$DATA_DIR/zim/${cand}"; then file="$cand"; break; fi
+      echo "warn $cand is not downloadable right now"; rm -f "$DATA_DIR/zim/${cand}.part"
+    done
+    if [ -z "$file" ]; then echo "skip $prefix (not available)"; continue; fi
     # a newer Kiwix snapshot replaces the older one (two dates of one archive would be searched twice)
     for old in "$DATA_DIR"/zim/"${prefix}"_[0-9][0-9][0-9][0-9]-[0-9][0-9].zim; do
       [ -e "$old" ] && [ "$(basename "$old")" != "$file" ] && { echo "drop $old (superseded by $file)"; rm -f "$old"; }

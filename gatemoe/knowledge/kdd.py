@@ -179,7 +179,10 @@ def available(project: str, timeout: float = 60) -> list[dict]:
         cur = latest.get(m["prefix"])
         if cur is None or m["date"] > cur["date"]:
             latest[m["prefix"]] = {"prefix": m["prefix"], "file": name, "date": m["date"], "size_mb": size,
-                                   "url": url + name}
+                                   "url": url + name, "previous": cur}
+        elif cur.get("previous") is None or m["date"] > cur["previous"]["date"]:
+            cur["previous"] = {"prefix": m["prefix"], "file": name, "date": m["date"], "size_mb": size,
+                               "url": url + name}
     return sorted(latest.values(), key=lambda r: r["prefix"])
 
 
@@ -227,7 +230,8 @@ def field_plan(lang: str = "en", count: int = 50, max_gb: float = 60.0, installe
         if (total + size) / 1024 > max_gb:
             skipped.append({**r, "why": "over the disk budget"})
             continue
-        plan.append({k: v for k, v in r.items() if not k.startswith("_")})
+        plan.append({k: (({kk: vv for kk, vv in v.items() if kk != "previous"} if isinstance(v, dict) else v)
+                         if k == "previous" else v) for k, v in r.items() if not k.startswith("_")})
         total += size
     return {"archives": plan, "total_gb": round(total / 1024, 1), "skipped": skipped,
             "available": {"wikipedia_topics": len(wiki), "libretexts": len(libre), "stack_exchange": len(se)}}
@@ -316,6 +320,8 @@ def cmd_fields(cfg: Config, count: int = 50, max_gb: float = 60.0, lang: str = "
     ok = 0
     for r in plan["archives"]:
         res = install_snapshot(zim_dir, r)
+        if not res.get("ok") and r.get("previous"):        # newest snapshot not on the mirrors yet: the one before
+            res = install_snapshot(zim_dir, r["previous"])
         ok += bool(res.get("ok"))
         print(json.dumps(res), flush=True)
     print(f"{ok} of {len(plan['archives'])} archives installed; new lessons search them right away.")
