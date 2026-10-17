@@ -193,6 +193,11 @@ ACADEMIC_SE = {"physics", "chemistry", "biology", "math", "mathoverflow.net", "c
                "matheducators", "bioinformatics", "quant", "scicomp", "softwareengineering", "robotics",
                "space", "sustainability", "medicalsciences", "ell", "english", "academia", "genealogy"}
 _WIKI_GENERAL = {"all", "top", "100", "simple", "wp1-0.8", "top1m"}
+# Wikipedia topic selections that are fields of study (Kiwix also publishes sports, films, comics, ...)
+ACADEMIC_WIKI = {"astronomy", "biology", "chemistry", "climate-change", "computer", "economics", "ecology",
+                 "education", "energy", "engineering", "environment", "geography", "geology", "history",
+                 "linguistics", "literature", "mathematics", "medicine", "molcell", "neuroscience", "philosophy",
+                 "physics", "politics", "psychology", "sociology", "statistics", "technology", "law"}
 _FLAVOURS = ("nopic", "mini", "maxi")
 
 
@@ -207,6 +212,8 @@ def field_plan(lang: str = "en", count: int = 50, max_gb: float = 60.0, installe
     for r in src.get("wikipedia", []):
         m = re.match(rf"^wikipedia_{re.escape(lang)}_(?P<topic>.+)_(?P<flav>{'|'.join(_FLAVOURS)})$", r["prefix"])
         if not m or m["topic"] in _WIKI_GENERAL or m["topic"].startswith("all"):
+            continue
+        if m["topic"].replace("_", "-") not in ACADEMIC_WIKI:     # sports, films, ... are not school subjects
             continue
         cur = wiki.get(m["topic"])
         if cur is None or _FLAVOURS.index(m["flav"]) < _FLAVOURS.index(cur["_flav"]):
@@ -301,9 +308,25 @@ def install_snapshot(zim_dir: Path, snap: dict, keep_old: bool = False, min_free
             "removed": removed}
 
 
-def cmd_fields(cfg: Config, count: int = 50, max_gb: float = 60.0, lang: str = "en", apply: bool = False) -> int:
-    """Plan (and with ``apply`` install) a pack of subject archives from the live Kiwix catalogue."""
+def cmd_fields(cfg: Config, count: int = 50, max_gb: float = 60.0, lang: str = "en", apply: bool = False,
+               also: list[str] | None = None) -> int:
+    """Plan (and with ``apply`` install) a pack of subject archives from the live Kiwix catalogue.
+    ``also``: whole archives to install first, e.g. wikipedia_en_all_nopic, wikibooks_en_all_nopic."""
     zim_dir = cfg.path("paths.zim_dir")
+    for prefix in also or []:
+        if prefix in installed_prefixes(zim_dir):
+            print(f"ok      {prefix} (installed)")
+            continue
+        rows = [r for r in available(project_of(prefix)) if r["prefix"] == prefix]
+        if not rows:
+            print(f"missing {prefix} (not on Kiwix)")
+            continue
+        print(f"get     {prefix}: {rows[0]['file']} ({(rows[0]['size_mb'] or 0) / 1024:.1f} GB)", flush=True)
+        if apply:
+            res = install_snapshot(zim_dir, rows[0])
+            if not res.get("ok") and rows[0].get("previous"):
+                res = install_snapshot(zim_dir, rows[0]["previous"])
+            print(json.dumps(res), flush=True)
     plan = field_plan(lang, count, max_gb, set(installed_prefixes(zim_dir)))
     a = plan["available"]
     print(f"Kiwix has {a['wikipedia_topics']} Wikipedia topic selections, {a['libretexts']} LibreTexts libraries and "

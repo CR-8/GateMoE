@@ -177,7 +177,8 @@ def cmd_kdd(args, cfg) -> int:
     if args.action == "snapshots":
         return kdd.cmd_update(cfg, apply=args.apply, add=args.add)
     if args.action == "fields":
-        return kdd.cmd_fields(cfg, count=args.count, max_gb=args.max_gb, lang=args.lang, apply=args.apply)
+        return kdd.cmd_fields(cfg, count=args.count, max_gb=args.max_gb, lang=args.lang, apply=args.apply,
+                              also=args.also)
     from .knowledge.delta import DeltaKDD, fetch_arxiv, read_inbox
 
     d = DeltaKDD(cfg)
@@ -246,6 +247,7 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--count", type=int, default=50, help="fields: how many subject archives to add (default 50)")
     s.add_argument("--max-gb", type=float, default=60.0, help="fields: disk budget for the new archives (default 60)")
     s.add_argument("--lang", default="en", help="fields: language of the archives (default en)")
+    s.add_argument("--also", nargs="*", default=[], help="fields: whole archives to install first, e.g. wikipedia_en_all_nopic")
     s.add_argument("--add", nargs="*", help="snapshots: archive prefixes to add, e.g. libretexts.org_en_bio")
     s.add_argument("--no-arxiv", action="store_true", help="ingest/run: inbox only")
     s.add_argument("--categories", help="ingest/run: arXiv categories, e.g. cs.RO,eess.SY")

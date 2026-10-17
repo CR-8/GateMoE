@@ -9,6 +9,7 @@ PRE = """<pre><a href="../">../</a>
 <a href="wikipedia_en_history_nopic_2025-06.zim">wikipedia_en_history_nopic_2025-06.zim</a>     2025-06-10 08:12   812M
 <a href="wikipedia_en_history_nopic_2025-09.zim">wikipedia_en_history_nopic_2025-09.zim</a>     2025-09-11 09:40   1.2G
 <a href="wikipedia_en_100_maxi_2025-09.zim">wikipedia_en_100_maxi_2025-09.zim</a>     2025-09-01 01:00    20M
+<a href="wikipedia_en_football_nopic_2025-08.zim">wikipedia_en_football_nopic_2025-08.zim</a>     2025-08-02 10:00   2.6G
 <a href="wikipedia_en_music_maxi_2025-08.zim">wikipedia_en_music_maxi_2025-08.zim</a>     2025-08-02 10:00   3.4G
 <a href="wikipedia_en_music_nopic_2025-08.zim">wikipedia_en_music_nopic_2025-08.zim</a>     2025-08-02 10:00   600M
 <a href="wikipedia_en_physics_nopic_2025-08.zim">wikipedia_en_physics_nopic_2025-08.zim</a>   2025-08-03 10:00   430M
@@ -48,12 +49,13 @@ def test_field_plan_prefers_text_only_skips_installed_and_general():
     src = {"wikipedia": _rows(PRE, "wikipedia"), "libretexts": _rows(TABLE, "libretexts"), "stack_exchange": se}
     plan = field_plan("en", count=50, max_gb=60, installed={"wikipedia_en_physics_nopic"}, sources=src)
     files = [r["file"] for r in plan["archives"]]
-    assert files == ["wikipedia_en_history_nopic_2025-09.zim", "wikipedia_en_music_nopic_2025-08.zim",
+    assert files == ["wikipedia_en_history_nopic_2025-09.zim",
                      "libretexts.org_en_bio_2025-01.zim", "libretexts.org_en_human_2025-01.zim",
-                     "physics.stackexchange.com_en_all_2025-07.zim"]          # no _all/_100, no maxi, no gaming
+                     "physics.stackexchange.com_en_all_2025-07.zim"]    # fields of study only: no football, music, gaming
     small = field_plan("en", count=50, max_gb=2.0, installed=set(), sources=src)
     assert small["total_gb"] <= 2.0 and small["skipped"]
     assert len(field_plan("en", count=2, max_gb=60, installed=set(), sources=src)["archives"]) == 2
+    assert all("previous" not in (r.get("previous") or {}) for r in plan["archives"])
 
 
 class _It(Item):
